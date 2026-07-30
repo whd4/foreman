@@ -538,9 +538,11 @@ async function main() {
         if (s.hooks.length) ok(`hooks wired: ${s.hooks.join(", ")}`);
         else bad("no hooks wired — run: foreman init");
         if (s.missing?.length) warn(`not wired: ${s.missing.join(", ")}`);
-        if (s.statusLine) ok("status line wired — cost and context will be live");
-        else if (s.foreignStatusLine) warn("another status line is installed; cost and context will stay empty. Re-run: foreman init --force");
-        else bad("no status line — cost and context will stay empty. Run: foreman init");
+        // Cost and context come from the transcript now, so a missing status line is
+        // cosmetic. Saying otherwise sends people to fix the wrong thing.
+        if (s.statusLine) ok("status line wired (prints the readout; the numbers come from the transcript)");
+        else if (s.foreignStatusLine) console.log(dim("    another status line is installed — fine, the numbers don't depend on it"));
+        else console.log(dim("    no status line — optional; the numbers come from the transcript"));
       }
 
       const g = goose.status();
