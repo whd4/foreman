@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.0 — 2026-07-30
+
+### The command is now `fmn`, not `foreman`
+
+**Breaking.** The package is still `@whd4/foreman`; only the command it puts on your PATH
+has changed.
+
+`foreman(1)` is Heroku's Procfile runner — a long-established Ruby tool already installed on
+a great many developer machines. Declaring `bin: {"foreman": …}` meant a global install would
+drop `foreman`, `foreman.cmd` and `foreman.ps1` onto the user's PATH and shadow it. Installing
+over somebody's existing tooling is the worst possible first impression, and it would have
+been discovered by strangers rather than by us.
+
+The precedent is unambiguous: the npm package described as *"Node Implementation of Foreman"*
+ships its binary as **`nf`** rather than take the name. `fmn` is the same move. Verified before
+choosing it — no npm package named `fmn`, and nothing by that name on PATH. (`fman` was
+rejected: a real package already ships that binary.)
+
+- `BIN_NAME`, `OUR_MARKS` and `isOurCommand` now live in one place in `paths.js`, so the name
+  cannot drift between the two adapters again.
+- **A pre-rename install is still recognised.** `isOurCommand` matches `foreman` as well as
+  `fmn`, so hooks written by an earlier version are still detected by `doctor` and still
+  removable by `uninstall`, rather than being silently orphaned in someone's settings file.
+- Every command example in the CLI help, README and changelog was rewritten against an
+  explicit subcommand list — deliberately not a blind word swap, so the package name, the
+  goose plugin directory `~/.agents/plugins/foreman/`, and the historical `foreman-agent`
+  references all survive untouched.
+
 ## 0.4.0 — 2026-07-30
 
 ### Readings are per session, and they add up
@@ -9,11 +37,11 @@ machine**, all firing hooks into the same `state.json` and `hud.json`. Last writ
 readout showed a random session's numbers while looking completely authoritative.
 
 State and HUD are now keyed by session id, which both agents send in every hook payload. The
-flat files remain as a "most recent activity" view so `foreman watch` with no arguments still
+flat files remain as a "most recent activity" view so `fmn watch` with no arguments still
 works.
 
 ```
-foreman sessions
+fmn sessions
 ```
 
 ```
@@ -30,7 +58,7 @@ Every session individually read as healthy. None knew about the other three. **T
 aggregate view the whole thesis rests on** — N agents is N times the spend, and every tool in
 this space shows you one Nth of it.
 
-- `foreman sessions` — per-agent breakdown plus the combined total
+- `fmn sessions` — per-agent breakdown plus the combined total
 - `listSessions()` / `aggregate()` exported for host applications
 - Session ids come from an untrusted payload and become a path, so they are sanitised. An id
   of exactly `..` survives separator-stripping and resolves to the parent directory, which
@@ -54,11 +82,11 @@ up the stop sign telling you to start a fresh window while you were **30.6%** fu
 
 So readings now come from the agent's own transcript, which hooks point at directly:
 
-- `foreman sample` — exact token counts, read from the transcript
+- `fmn sample` — exact token counts, read from the transcript
 - Sampling runs on **every hook**, so the numbers move as often as the character does
 - Tail-read for the current prompt (O(1)) plus an incremental scan by byte offset for
   session totals (O(delta)). **1.05 ms warm** on a 1.79 MB transcript; 8.8 ms cold
-- `foreman set windowTokens|price|character`
+- `fmn set windowTokens|price|character`
 
 Two rules the new code will not break:
 
@@ -70,7 +98,7 @@ Two rules the new code will not break:
   a window someone asserted, the assertion is labelled, and usage beyond it is flagged as a
   contradiction rather than clamped to 100%.
 
-`foreman doctor` now compares the age of the state against the age of the numbers and says
+`fmn doctor` now compares the age of the state against the age of the numbers and says
 outright when they have diverged — the failure that hid for 76 minutes.
 
 ### goose adapter
@@ -78,7 +106,7 @@ outright when they have diverged — the failure that hid for 76 minutes.
 Second agent supported, against the Open Plugins hooks spec goose adopted 2026-05-14
 (source: `goose-docs.ai/blog/2026/05/14/goose-hooks/`, read 2026-07-30).
 
-- `foreman init goose` / `foreman uninstall goose`
+- `fmn init goose` / `fmn uninstall goose`
 - Writes `~/.agents/plugins/foreman/hooks/hooks.json`, all 11 lifecycle events
 - Structurally safer than the Claude Code adapter: goose gives us our own plugin directory,
   so nothing the user owns is edited
@@ -104,7 +132,7 @@ scope must match the publishing npm account.
 States draw into a `Frame` through the scene helper and never touch pixels directly, so the
 SVG path inherited all 22 states with no engine changes.
 
-- `foreman svg [state]`, `--all` (contact sheet), `--live`, `--pose`, `--prop`
+- `fmn svg [state]`, `--all` (contact sheet), `--live`, `--pose`, `--prop`
 - Pixels merge into rectangles losslessly — the crab drops from ~80 pixels to ~30 rects —
   and group by colour, so the art scales without resampling
 - Rendering is seeded, so an unchanged character produces a byte-identical file

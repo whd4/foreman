@@ -7,7 +7,7 @@
 //   4. it is idempotent — running init twice does not double the hooks
 
 import fs from "node:fs";
-import { claudeSettings, backup, readJson, writeJson } from "../paths.js";
+import { claudeSettings, backup, readJson, writeJson, isOurCommand, resolveBin } from "../paths.js";
 
 export const id = "claude-code";
 export const label = "Claude Code";
@@ -18,16 +18,13 @@ export const HOOK_EVENTS = [
   "SubagentStop", "Notification", "PreCompact", "Stop",
 ];
 
-const MARK = "foreman";
-const isOurs = (cmd) => typeof cmd === "string" && cmd.includes(MARK);
+const isOurs = isOurCommand;
 
 function hookCommand(bin) { return `${bin} hook`; }
 function statusCommand(bin) { return `${bin} status`; }
 
-/** Resolve how the hook should invoke us. `foreman` on PATH once globally installed. */
-export function resolveBin() {
-  return process.env.FOREMAN_BIN || "foreman";
-}
+/** Resolve how the hook should invoke us. `fmn` on PATH once globally installed. */
+export { resolveBin };
 
 export function detect() {
   return fs.existsSync(claudeSettings());

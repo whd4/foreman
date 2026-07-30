@@ -21,8 +21,8 @@ Zero dependencies. Node 18+. MIT.
 
 ```bash
 npm i -g @whd4/foreman
-foreman init            # or: foreman init goose
-foreman watch
+fmn init            # or: fmn init goose
+fmn watch
 ```
 
 Supported agents: **Claude Code** and **goose**.
@@ -32,7 +32,7 @@ up first**, **merges** rather than replaces, and is safe to run twice. It will n
 status line you already have unless you pass `--force`. For goose it writes its own plugin at
 `~/.agents/plugins/foreman/`, so nothing you own is touched at all.
 
-Run `foreman init --dry-run` first if you want to see the change before it happens.
+Run `fmn init --dry-run` first if you want to see the change before it happens.
 
 ---
 
@@ -58,8 +58,8 @@ transcript is JSONL, and assistant records carry exact token counts. The numbers
 on disk; they just weren't being read.
 
 ```bash
-foreman sample          # what it can see right now
-foreman sample --json   # the same, for scripts
+fmn sample          # what it can see right now
+fmn sample --json   # the same, for scripts
 ```
 
 Reading the tail is O(1) in session length and totals accumulate incrementally by byte offset,
@@ -74,7 +74,7 @@ tokens it excludes. With no price set it shows a blank, because a guessed rate i
 nothing.
 
 ```bash
-foreman set price opus-5-fast     # only rates verified against a dated source ship
+fmn set price opus-5-fast     # only rates verified against a dated source ship
 ```
 
 **The window size is an assertion, not a measurement.** The transcript says how much was sent,
@@ -83,14 +83,14 @@ assertion is labelled, and usage beyond it is flagged as a contradiction rather 
 clamped to 100%.
 
 ```bash
-foreman set windowTokens 1000000
+fmn set windowTokens 1000000
 ```
 
-`foreman doctor` compares how old the state is against how old the numbers are and says
+`fmn doctor` compares how old the state is against how old the numbers are and says
 outright when they've diverged — the failure that hid for 76 minutes.
 
 > **goose caveat:** goose's hook payloads carry no transcript path, so on goose the character
-> animates correctly but cost and context stay empty. `foreman doctor` says so rather than
+> animates correctly but cost and context stay empty. `fmn doctor` says so rather than
 > letting it look broken.
 
 ---
@@ -101,7 +101,7 @@ You are probably running more than one. Every reading is keyed by session id, so
 agents stop overwriting each other — and the totals get added up:
 
 ```bash
-foreman sessions
+fmn sessions
 ```
 
 ```
@@ -131,21 +131,21 @@ before they touch the filesystem.
 
 | Command | What it does |
 |---|---|
-| `foreman init [agent]` | Wire up `claude-code` (default) or `goose`. `--dry-run`, `--force` |
-| `foreman watch` | Live character in your terminal. `--once` for a single frame |
-| `foreman sample` | Read cost + context from the transcript. `--json`, `--window`, `--price` |
-| `foreman sessions` | Every agent running, and the combined total |
-| `foreman set <k> <v>` | `windowTokens`, `price`, `character` |
-| `foreman status` | Print the readout. Called by the status line |
-| `foreman hook` | Map a hook payload to a state **and refresh the numbers**. Reads stdin |
-| `foreman emit <state>` | Set the state by hand — for loops and verifiers |
-| `foreman svg [state]` | Render to SVG. `--all`, `--live`, `--pose`, `--prop`, `--out` |
-| `foreman list` | Installed characters |
-| `foreman use <name>` | Switch character |
-| `foreman validate <file>` | Check a character pack before shipping it |
-| `foreman states` | Every state and what triggers it |
-| `foreman doctor` | What's wired, what isn't, and what the runtime last saw |
-| `foreman uninstall` | Remove everything it added |
+| `fmn init [agent]` | Wire up `claude-code` (default) or `goose`. `--dry-run`, `--force` |
+| `fmn watch` | Live character in your terminal. `--once` for a single frame |
+| `fmn sample` | Read cost + context from the transcript. `--json`, `--window`, `--price` |
+| `fmn sessions` | Every agent running, and the combined total |
+| `fmn set <k> <v>` | `windowTokens`, `price`, `character` |
+| `fmn status` | Print the readout. Called by the status line |
+| `fmn hook` | Map a hook payload to a state **and refresh the numbers**. Reads stdin |
+| `fmn emit <state>` | Set the state by hand — for loops and verifiers |
+| `fmn svg [state]` | Render to SVG. `--all`, `--live`, `--pose`, `--prop`, `--out` |
+| `fmn list` | Installed characters |
+| `fmn use <name>` | Switch character |
+| `fmn validate <file>` | Check a character pack before shipping it |
+| `fmn states` | Every state and what triggers it |
+| `fmn doctor` | What's wired, what isn't, and what the runtime last saw |
+| `fmn uninstall` | Remove everything it added |
 
 ---
 
@@ -176,10 +176,10 @@ Things no hook knows about — a loop pass finishing, an adversarial verifier's 
 one line from wherever you know it:
 
 ```bash
-foreman emit flip
-foreman emit highFive     # verifier confirmed
-foreman emit refute       # verifier refuted
-foreman emit trophy       # a verifiable goal met its criteria
+fmn emit flip
+fmn emit highFive     # verifier confirmed
+fmn emit refute       # verifier refuted
+fmn emit trophy       # a verifiable goal met its criteria
 ```
 
 ---
@@ -225,7 +225,7 @@ props: `flag`, `stop`, `crate`, `coin`. Optional but used when present: `hold` (
 **Prop anchoring belongs to the pack, not the engine**, so a new character can't inherit a
 misplaced prop.
 
-Drop a pack in `~/.foreman/characters/`, run `foreman validate` on it, then `foreman use`.
+Drop a pack in `~/.foreman/characters/`, run `fmn validate` on it, then `fmn use`.
 The validator is strict about ragged grids and missing palette entries, because those render
 as garbage that looks like an engine bug and waste an author's afternoon.
 
@@ -266,9 +266,9 @@ The same engine renders to SVG, so a state looks the same in a README, a docs pa
 desktop window as it does in your shell.
 
 ```bash
-foreman svg hammer --out hammer.svg     # one state
-foreman svg --all --out states.html     # every state on one page
-foreman svg --live --out live.html      # the event-driven view
+fmn svg hammer --out hammer.svg     # one state
+fmn svg --all --out states.html     # every state on one page
+fmn svg --live --out live.html      # the event-driven view
 ```
 
 Pixels become **merged rectangles**, not a bitmap: adjacent same-colour pixels collapse

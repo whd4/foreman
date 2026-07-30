@@ -19,7 +19,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { goosePlugins, backup, readJson, writeJson, ensureDir } from "../paths.js";
+import { goosePlugins, backup, readJson, writeJson, ensureDir, isOurCommand, resolveBin } from "../paths.js";
 
 export const id = "goose";
 export const label = "goose";
@@ -41,9 +41,7 @@ const PLUGIN_NAME = "foreman";
 export const pluginDir = () => path.join(goosePlugins(), PLUGIN_NAME);
 export const hooksFile = () => path.join(pluginDir(), "hooks", "hooks.json");
 
-export function resolveBin() {
-  return process.env.FOREMAN_BIN || "foreman";
-}
+export { resolveBin };
 
 export function detect() {
   // The plugin root is agent-neutral and goose creates it lazily, so its absence is not
@@ -110,7 +108,7 @@ export function status() {
     return { file, exists: false, events: [], missing: [...HOOK_EVENTS], providesCost: PROVIDES_COST };
   }
   const events = HOOK_EVENTS.filter((e) =>
-    (cfg.hooks?.[e] ?? []).some((g) => (g?.hooks ?? []).some((h) => typeof h?.command === "string" && h.command.includes("foreman"))));
+    (cfg.hooks?.[e] ?? []).some((g) => (g?.hooks ?? []).some((h) => isOurCommand(h?.command))));
 
   return {
     file,

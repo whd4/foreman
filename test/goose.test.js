@@ -16,6 +16,7 @@ process.env.FOREMAN_CLAUDE_SETTINGS = path.join(sandbox, "claude", "settings.jso
 process.env.FOREMAN_GOOSE_PLUGINS = path.join(sandbox, "agents", "plugins");
 
 const goose = await import("../src/adapters/goose.js");
+const { BIN_NAME, resolveBin, isOurCommand } = await import("../src/paths.js");
 const { stateForHook, normalizeHook, toolKind } = await import("../src/state.js");
 const { STATES } = await import("../src/engine.js");
 const { getAdapter, ADAPTERS } = await import("../src/index.js");
@@ -28,8 +29,22 @@ test("the plugin goes to ~/.agents/plugins/foreman/hooks/hooks.json", () => {
   assert.equal(path.basename(path.dirname(path.dirname(f))), "foreman");
 });
 
+test("the installed command is not 'foreman'", () => {
+  // foreman(1) is Heroku's Procfile runner and is already on many PATHs; the npm package
+  // called "Node Implementation of Foreman" ships as `nf` rather than collide with it
+  assert.equal(BIN_NAME, "fmn");
+  assert.notEqual(BIN_NAME, "foreman");
+  assert.equal(resolveBin(), "fmn");
+});
+
+test("a pre-rename install is still recognised, so it stays removable", () => {
+  assert.ok(isOurCommand("foreman hook"), "old installs must not become orphans");
+  assert.ok(isOurCommand("fmn hook"));
+  assert.ok(!isOurCommand("some-other-tool statusline"));
+});
+
 test("install writes the structure goose documents", () => {
-  const r = goose.install({ bin: "foreman" });
+  const r = goose.install({ bin: "fmn" });
   assert.ok(fs.existsSync(r.file));
   const cfg = JSON.parse(fs.readFileSync(r.file, "utf8"));
 
@@ -39,14 +54,14 @@ test("install writes the structure goose documents", () => {
     assert.ok(Array.isArray(groups), `${evt} must be an array`);
     const h = groups[0].hooks[0];
     assert.equal(h.type, "command");
-    assert.equal(h.command, "foreman hook");
+    assert.equal(h.command, "fmn hook");
   }
 });
 
 test("install is idempotent and backs up an existing file", () => {
-  const first = goose.install({ bin: "foreman" });
+  const first = goose.install({ bin: "fmn" });
   const before = fs.readFileSync(first.file, "utf8");
-  const second = goose.install({ bin: "foreman" });
+  const second = goose.install({ bin: "fmn" });
   assert.equal(fs.readFileSync(second.file, "utf8"), before, "content drifted on re-install");
   assert.ok(second.backup, "an existing file must be backed up");
   assert.equal(second.created, false);
@@ -62,13 +77,13 @@ test("a dry run writes nothing", () => {
 });
 
 test("install states the cost limitation rather than hiding it", () => {
-  const r = goose.install({ bin: "foreman" });
+  const r = goose.install({ bin: "fmn" });
   assert.ok(r.warnings.some((w) => /cost and context/i.test(w)), "must warn that cost is unavailable");
   assert.equal(goose.PROVIDES_COST, false);
 });
 
 test("status reports what is wired", () => {
-  goose.install({ bin: "foreman" });
+  goose.install({ bin: "fmn" });
   const s = goose.status();
   assert.ok(s.exists);
   assert.deepEqual(s.missing, []);
@@ -83,7 +98,7 @@ test("uninstall removes only our plugin directory", () => {
   fs.mkdirSync(neighbour, { recursive: true });
   fs.writeFileSync(path.join(neighbour, "hooks.json"), "{}");
 
-  goose.install({ bin: "foreman" });
+  goose.install({ bin: "fmn" });
   const r = goose.uninstall();
   assert.ok(r.removed);
   assert.ok(!fs.existsSync(goose.pluginDir()), "our plugin should be gone");

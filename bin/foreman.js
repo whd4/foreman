@@ -59,23 +59,23 @@ const positional = rest.filter((a, i) => !a.startsWith("--") && !consumed.has(i)
 
 function usage() {
   console.log(`
-${org("foreman")} ${dim("— know what your agent is doing and what it's costing")}
+${org("fmn")} ${dim("— know what your agent is doing and what it's costing")}
 
-  ${b("foreman init")} [agent]        wire up hooks + status line   ${dim("(default: claude-code)")}
-  ${b("foreman watch")}              live character in this terminal
-  ${b("foreman status")}              print the one-line readout    ${dim("(called by the status line)")}
-  ${b("foreman hook")}               map a hook payload to a state ${dim("(called by hooks, reads stdin)")}
-  ${b("foreman emit")} <state>        set the state by hand
-  ${b("foreman sample")}             read cost + context from the transcript ${dim("(--json)")}
-  ${b("foreman sessions")}           every agent running, and the combined total
-  ${b("foreman set")} <key> <value>   windowTokens · price · character
-  ${b("foreman svg")} [state]        render to SVG            ${dim("(--all, --live, --pose, --prop)")}
-  ${b("foreman list")}                installed characters
-  ${b("foreman use")} <character>     switch character
-  ${b("foreman validate")} <file>     check a character pack
-  ${b("foreman states")}              every state and what triggers it
-  ${b("foreman doctor")}              what's wired, what isn't
-  ${b("foreman uninstall")}           remove hooks + status line
+  ${b("fmn init")} [agent]        wire up hooks + status line   ${dim("(default: claude-code)")}
+  ${b("fmn watch")}              live character in this terminal
+  ${b("fmn status")}              print the one-line readout    ${dim("(called by the status line)")}
+  ${b("fmn hook")}               map a hook payload to a state ${dim("(called by hooks, reads stdin)")}
+  ${b("fmn emit")} <state>        set the state by hand
+  ${b("fmn sample")}             read cost + context from the transcript ${dim("(--json)")}
+  ${b("fmn sessions")}           every agent running, and the combined total
+  ${b("fmn set")} <key> <value>   windowTokens · price · character
+  ${b("fmn svg")} [state]        render to SVG            ${dim("(--all, --live, --pose, --prop)")}
+  ${b("fmn list")}                installed characters
+  ${b("fmn use")} <character>     switch character
+  ${b("fmn validate")} <file>     check a character pack
+  ${b("fmn states")}              every state and what triggers it
+  ${b("fmn doctor")}              what's wired, what isn't
+  ${b("fmn uninstall")}           remove hooks + status line
 
 ${dim("flags")}  --dry-run   show changes without writing
        --force     replace an existing status line
@@ -251,7 +251,7 @@ async function main() {
         ok(`${r.created ? "installed" : "updated"} plugin — ${r.events.length} events: ${r.events.join(", ")}`);
         for (const w of r.warnings) warn(w);
         if (r.dryRun) warn("dry run — nothing was written");
-        else console.log(`\n${dim("restart goose, then run")} ${b("foreman watch")}\n`);
+        else console.log(`\n${dim("restart goose, then run")} ${b("fmn watch")}\n`);
         break;
       }
 
@@ -265,7 +265,7 @@ async function main() {
       console.log(`  status line: ${r.statusLine === "kept" ? ylw(r.statusLine) : grn(r.statusLine)}`);
       for (const w of r.warnings) warn(w);
       if (r.dryRun) warn("dry run — nothing was written");
-      else console.log(`\n${dim("restart your agent, then run")} ${b("foreman watch")}\n`);
+      else console.log(`\n${dim("restart your agent, then run")} ${b("fmn watch")}\n`);
       break;
     }
 
@@ -291,8 +291,8 @@ async function main() {
 
     case "emit": {
       const s = positional[0];
-      if (!s) { bad("which state? try: foreman states"); process.exit(1); }
-      if (!STATES[s]) { bad(`unknown state '${s}'. Run 'foreman states'.`); process.exit(1); }
+      if (!s) { bad("which state? try: fmn states"); process.exit(1); }
+      if (!STATES[s]) { bad(`unknown state '${s}'. Run 'fmn states'.`); process.exit(1); }
       store.emit(s);
       ok(`state = ${org(s)}`);
       break;
@@ -330,11 +330,11 @@ async function main() {
         const col = s.windowExceeded ? red : s.ctxPct >= 85 ? red : s.ctxPct >= 55 ? ylw : grn;
         console.log(`    of assumed window    ${col(s.ctxPct + "%")} ${dim(`(${n(s.ctxSize)} — ${s.windowSource})`)}`);
       } else {
-        warn("no window size set, so no percentage. Set one: foreman set windowTokens 1000000");
+        warn("no window size set, so no percentage. Set one: fmn set windowTokens 1000000");
       }
       if (s.windowExceeded) {
         bad(`usage EXCEEDS the assumed window — the window setting is wrong, not the usage.`);
-        console.log(`      ${dim("Opus 5 is documented at 1M. Try: foreman set windowTokens 1000000")}`);
+        console.log(`      ${dim("Opus 5 is documented at 1M. Try: fmn set windowTokens 1000000")}`);
       }
 
       console.log(`\n  ${b("session totals")} ${dim(`(${n(t.messages)} assistant messages)`)}`);
@@ -345,7 +345,7 @@ async function main() {
       if (s.costUsd === null) {
         console.log(`    ${dim("not reported — no price set. A guessed rate is worse than a blank.")}`);
         const known = Object.keys(PRICES);
-        if (known.length) console.log(`    ${dim(`set one: foreman set price ${known[0]}`)}`);
+        if (known.length) console.log(`    ${dim(`set one: fmn set price ${known[0]}`)}`);
       } else {
         console.log(`    ${b("~$" + s.costUsd.toFixed(2))} ${ylw("ESTIMATE")} ${dim(s.costBasis.label)}`);
         console.log(`    ${dim("source: " + s.costBasis.source)}`);
@@ -388,7 +388,7 @@ async function main() {
       console.log(`    output ${n(agg.totals.outputTokens)}   input ${n(agg.totals.inputTokens)}`);
       console.log(`    cache read ${n(agg.totals.cacheReadTokens)}   cache write ${n(agg.totals.cacheCreateTokens)}`);
       console.log(`    ${n(agg.totals.messages)} assistant messages`);
-      if (agg.costUsd === null) console.log(`    ${dim("cost not reported — no price set (foreman set price ...)")}`);
+      if (agg.costUsd === null) console.log(`    ${dim("cost not reported — no price set (fmn set price ...)")}`);
       else console.log(`    ${b("~$" + agg.costUsd.toFixed(2))} ${ylw("ESTIMATE")} ${dim("summed across sessions")}`);
       console.log("");
       break;
@@ -398,7 +398,7 @@ async function main() {
       const key = positional[0], val = positional[1];
       const ALLOWED = ["windowTokens", "price", "character"];
       if (!key || val === undefined) {
-        console.log(`\n  ${b("foreman set <key> <value>")}\n`);
+        console.log(`\n  ${b("fmn set <key> <value>")}\n`);
         const cfg = store.getConfig();
         for (const k of ALLOWED) console.log(`    ${org(k.padEnd(14))} ${dim(String(cfg[k] ?? "(unset)"))}`);
         console.log(`\n  ${dim("price presets: " + (Object.keys(PRICES).join(", ") || "(none)"))}\n`);
@@ -451,7 +451,7 @@ async function main() {
           kind = `prop ${opt("prop")}`;
         } else {
           const state = positional[0] ?? store.readState().state ?? "idle";
-          if (!STATES[state]) { bad(`unknown state '${state}'. Run 'foreman states'.`); process.exit(1); }
+          if (!STATES[state]) { bad(`unknown state '${state}'. Run 'fmn states'.`); process.exit(1); }
           body = renderSvg(pack, { state, t, hud, scale, autoFromHud: Object.keys(hud).length > 0 });
           kind = `state ${state}`;
         }
@@ -478,13 +478,13 @@ async function main() {
         console.log(`  ${mark} ${b(it.name.padEnd(14))} ${dim(`${it.poses} poses  ${it.props} props`)}` +
                     `  ${dim(it.license ?? "no license")}${health}`);
       }
-      console.log(`\n  ${dim("switch with")} foreman use <name>\n`);
+      console.log(`\n  ${dim("switch with")} fmn use <name>\n`);
       break;
     }
 
     case "use": {
       const name = positional[0];
-      if (!name) { bad("which character? try: foreman list"); process.exit(1); }
+      if (!name) { bad("which character? try: fmn list"); process.exit(1); }
       try { chars.load(name); } catch (e) { bad(e.message); process.exit(1); }
       store.setConfig({ character: name });
       ok(`character = ${org(name)}`);
@@ -533,10 +533,10 @@ async function main() {
       } catch (e) { bad(e.message); }
 
       console.log(`\n  ${b("claude code")} ${dim(s.file)}`);
-      if (!s.exists) { bad("settings file not found — run: foreman init"); }
+      if (!s.exists) { bad("settings file not found — run: fmn init"); }
       else {
         if (s.hooks.length) ok(`hooks wired: ${s.hooks.join(", ")}`);
-        else bad("no hooks wired — run: foreman init");
+        else bad("no hooks wired — run: fmn init");
         if (s.missing?.length) warn(`not wired: ${s.missing.join(", ")}`);
         // Cost and context come from the transcript now, so a missing status line is
         // cosmetic. Saying otherwise sends people to fix the wrong thing.
@@ -547,7 +547,7 @@ async function main() {
 
       const g = goose.status();
       console.log(`\n  ${b("goose")} ${dim(g.file)}`);
-      if (!g.exists) console.log(dim("    not installed — run: foreman init goose"));
+      if (!g.exists) console.log(dim("    not installed — run: fmn init goose"));
       else {
         ok(`plugin wired: ${g.events.length} events`);
         if (g.missing.length) warn(`not wired: ${g.missing.join(", ")}`);
@@ -570,11 +570,11 @@ async function main() {
         warn("no readings yet — they populate on the next tool call after init");
       } else if (stAge !== null && hAge !== null && hAge - stAge > 120) {
         bad(`the numbers are ${Math.round((hAge - stAge) / 60)} min staler than the state — something stopped feeding them`);
-        console.log(`    ${dim("if hud.src is 'status line', switch to the transcript: re-run foreman init")}`);
+        console.log(`    ${dim("if hud.src is 'status line', switch to the transcript: re-run fmn init")}`);
       }
       if (h.windowExceeded) {
         bad(`usage exceeds the configured window (${Number(h.ctxSize).toLocaleString("en-US")}) — that setting is wrong`);
-        console.log(`    ${dim("try: foreman set windowTokens 1000000")}`);
+        console.log(`    ${dim("try: fmn set windowTokens 1000000")}`);
       }
       console.log(`\n    ${dim(configFile())}\n    ${dim(stateFile())}\n    ${dim(hudFile())}\n`);
       break;

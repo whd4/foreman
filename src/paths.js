@@ -8,6 +8,32 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * The command this installs onto a user's PATH.
+ *
+ * NOT "foreman". `foreman(1)` is Heroku's Procfile runner, a long-established Ruby tool
+ * that already owns that name on a great many developer machines. The precedent is
+ * unambiguous: the npm package literally described as "Node Implementation of Foreman"
+ * ships its binary as `nf` rather than take it. Installing over someone's existing
+ * `foreman` would be the rudest possible first impression, so the package keeps the name
+ * and the command gets its own.
+ */
+export const BIN_NAME = "fmn";
+
+/**
+ * Command fragments that identify a hook as ours. "foreman" stays in the list so an
+ * install from before the rename is still recognised — and therefore still removable by
+ * `uninstall` — rather than being silently orphaned in someone's settings file.
+ */
+export const OUR_MARKS = [BIN_NAME, "foreman"];
+
+/** True when a settings command belongs to us. */
+export const isOurCommand = (cmd) =>
+  typeof cmd === "string" && OUR_MARKS.some((m) => cmd.includes(m));
+
+/** The command name to write into settings. Overridable for tests and odd installs. */
+export const resolveBin = () => process.env.FOREMAN_BIN || BIN_NAME;
+
 /** The installed package root (one level up from src/). */
 export const pkgRoot = path.resolve(here, "..");
 
