@@ -67,5 +67,13 @@ jobs:
       - name: Pack preview
         run: npm pack --dry-run
 
+      # Trusted publishing cannot be configured until the package exists, so the FIRST
+      # release falls back to a token in repository secrets. Add one at
+      # Settings -> Secrets and variables -> Actions -> New secret, named NPM_TOKEN
+      # (npmjs.com -> Access Tokens -> Generate -> Granular, Read and write).
+      # Once the package is live and the trusted publisher is configured, delete the
+      # secret: OIDC takes over on its own and nothing long-lived remains.
       - name: Publish
         run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
