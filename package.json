@@ -1,0 +1,55 @@
+{
+  "name": "@whd4/foreman",
+  "version": "0.3.0",
+  "description": "See what your coding agent is doing and what it's costing. Reads cost and context straight from the agent's own transcript, and puts it on screen as a character that reacts to the work.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Wm. H. Dwyer IV",
+  "homepage": "https://github.com/whd4/foreman#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whd4/foreman.git"
+  },
+  "bugs": {
+    "url": "https://github.com/whd4/foreman/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "foreman": "./bin/foreman.js"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./characters/*": "./characters/*"
+  },
+  "files": [
+    "bin",
+    "src",
+    "characters",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "claude-code",
+    "goose",
+    "agent",
+    "cost",
+    "tokens",
+    "context-window",
+    "observability",
+    "statusline",
+    "cli",
+    "tui",
+    "svg",
+    "pixel-art",
+    "mascot"
+  ],
+  "dependencies": {}
+}

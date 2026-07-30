@@ -1,0 +1,164 @@
+{
+  "name": "crab",
+  "author": "Foreman",
+  "license": "MIT",
+  "description": "The default. A small orange thing that stands on the prompt and reacts to what your agent is doing.",
+
+  "palette": {
+    "o": "#E8825A",
+    "d": "#B85F3E",
+    "h": "#F2A183",
+    "k": "#2A1C14"
+  },
+
+  "alt": {
+    "o": "#63C97C",
+    "d": "#3E9455",
+    "h": "#8FDBA1"
+  },
+
+  "hand": [6, 8],
+
+  "poses": {
+    "stand": [
+      "...hhhooo...",
+      "..oooooooo..",
+      ".oooooooooo.",
+      ".ookooookoo.",
+      ".oooooooooo.",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oo.oo.oo..",
+      "..o..o...o.."
+    ],
+    "stepA": [
+      "...hhhooo...",
+      "..oooooooo..",
+      ".oooooooooo.",
+      ".ookooookoo.",
+      ".oooooooooo.",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oo.oo.oo..",
+      ".o...o....o."
+    ],
+    "stepB": [
+      "...hhhooo...",
+      "..oooooooo..",
+      ".oooooooooo.",
+      ".ookooookoo.",
+      ".oooooooooo.",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oo.oo.oo..",
+      "...o...o..o."
+    ],
+    "hold": [
+      "...hhhooo.o.",
+      "..oooooooo.o",
+      ".oooooooooo.",
+      ".ookooookoo.",
+      ".oooooooooo.",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oo.oo.oo..",
+      "..o..o...o.."
+    ],
+    "blink": [
+      "...hhhooo...",
+      "..oooooooo..",
+      ".oooooooooo.",
+      ".ooddoooddo.",
+      ".oooooooooo.",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oo.oo.oo..",
+      "..o..o...o.."
+    ],
+    "crouch": [
+      "............",
+      "...hhhooo...",
+      "..oooooooo..",
+      ".ookooookoo.",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oooooooo..",
+      "..o.oo.oo.o.",
+      "............"
+    ],
+    "slump": [
+      "............",
+      "...hhhooo...",
+      "..oooooooo..",
+      ".oodddddoo..",
+      ".oooooooooo.",
+      "..dddddddd..",
+      "..oooooooo..",
+      ".o..oo.oo..o",
+      "............"
+    ]
+  },
+
+  "props": {
+    "flag": {
+      "grid": ["pwkwkw.", "pkwkwk.", "pwkwkw.", "p......", "p......", "p......"],
+      "palette": { "p": "#3A322A", "w": "#F4EDE2" }
+    },
+    "stop": {
+      "grid": ["..rrr..", ".rrrrr.", "rrrrrrr", "rwwwwwr", "rrrrrrr", ".rrrrr.", "...p..."],
+      "palette": { "r": "#D8543F", "w": "#F4EDE2", "p": "#3A322A" }
+    },
+    "crate": {
+      "grid": ["bbbbbb", "bggggb", "bgbbgb", "bggggb", "bbbbbb"],
+      "palette": { "b": "#8A5F3C", "g": "#7A5C3E" }
+    },
+    "coin": {
+      "grid": [".y.", "yyy", ".y."],
+      "palette": { "y": "#EFC65C" }
+    },
+    "bill": {
+      "grid": ["gggg", "gwgg", "gggg"],
+      "palette": { "g": "#5FA86B", "w": "#F4EDE2" }
+    },
+    "page": {
+      "grid": ["wwwww", "wgggw", "wwwww", "wgggw", "wwwww"],
+      "palette": { "w": "#F4EDE2", "g": "#9A9086" }
+    },
+    "shovel": {
+      "grid": ["..b..", "..b..", "..b..", ".sss.", ".sss."],
+      "palette": { "b": "#8A5F3C", "s": "#B4ADA2" }
+    },
+    "hammer": {
+      "grid": ["sss..", "sss..", "..b..", "..b..", "..b.."],
+      "palette": { "s": "#B4ADA2", "b": "#8A5F3C" }
+    },
+    "trophy": {
+      "grid": ["yyyyy", ".yyy.", ".yyy.", "..y..", ".yyy.", "yyyyy"],
+      "palette": { "y": "#EFC65C" }
+    },
+    "star": {
+      "grid": [".y.", "yyy", ".y."],
+      "palette": { "y": "#E5B54F" }
+    },
+    "spark": {
+      "grid": ["y"],
+      "palette": { "y": "#E5B54F" }
+    },
+    "dust": {
+      "grid": ["g"],
+      "palette": { "g": "#7A5C3E" }
+    },
+    "q": {
+      "grid": ["www", "..w", ".ww", "...", ".w."],
+      "palette": { "w": "#F4EDE2" }
+    },
+    "bang": {
+      "grid": [".y.", ".y.", ".y.", "...", ".y."],
+      "palette": { "y": "#E5B54F" }
+    },
+    "z": {
+      "grid": ["www", ".w.", "www"],
+      "palette": { "w": "#F4EDE2" }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+*.tgz
+.DS_Store
+Thumbs.db
+
+# generated design assets — regenerate with `foreman svg --all|--live`
+*.local.html
+coverage/
+.nyc_output/
+
+# never commit a real config or a captured session
+.foreman/
+*.backup-*
