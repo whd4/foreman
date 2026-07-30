@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.0 — 2026-07-30
+
+### Readings are per session, and they add up
+
+Found while verifying 0.3.0: **four Claude Code sessions were running concurrently on one
+machine**, all firing hooks into the same `state.json` and `hud.json`. Last writer won, so the
+readout showed a random session's numbers while looking completely authoritative.
+
+State and HUD are now keyed by session id, which both agents send in every hook payload. The
+flat files remain as a "most recent activity" view so `foreman watch` with no arguments still
+works.
+
+```
+foreman sessions
+```
+
+```
+  ● 3d273174   3s   26%   257,280 tok  dig
+  ○ a42b2fcb   4s   40%   398,309 tok  hammer
+  ○ f8faab57  46s   20%   202,099 tok  dig
+  ○ b666aad2   2m   26%   254,674 tok  wake
+
+  all sessions combined (4 active in the last 5 min, 4 total)
+    output 824,100   cache read 180,885,968   812 assistant messages
+```
+
+Every session individually read as healthy. None knew about the other three. **This is the
+aggregate view the whole thesis rests on** — N agents is N times the spend, and every tool in
+this space shows you one Nth of it.
+
+- `foreman sessions` — per-agent breakdown plus the combined total
+- `listSessions()` / `aggregate()` exported for host applications
+- Session ids come from an untrusted payload and become a path, so they are sanitised. An id
+  of exactly `..` survives separator-stripping and resolves to the parent directory, which
+  would have dropped a session file on top of the top-level config; ids that are only dots are
+  now rejected. Covered by tests.
+
 ## 0.3.0 — 2026-07-30
 
 ### Cost and context now come from the transcript, not the status line

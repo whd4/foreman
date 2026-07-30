@@ -6,7 +6,10 @@
 // Split deliberately: they come from different sources at different rates, and a hook
 // firing 20x a turn should not clobber cost data that only the status line knows.
 
-import { stateFile, hudFile, readJson, writeJson, configFile, ensureDir, configDir } from "./paths.js";
+import fs from "node:fs";
+import { stateFile, hudFile, readJson, writeJson, configFile, ensureDir, configDir,
+         sessionsDir, sessionDir, sessionStateFile, sessionHudFile, currentFile,
+         safeSessionId } from "./paths.js";
 
 const DEFAULT_CONFIG = {
   character: "crab",
@@ -33,25 +36,89 @@ export function setConfig(patch) {
   return next;
 }
 
-/** Record the current animation state. `seq` lets readers detect a change without polling content. */
+/** Note which session was most recently active, so readers have a sensible default. */
+function markCurrent(session) {
+  if (!session) return;
+  try { writeJson(currentFile(), { session: safeSessionId(session), at: new Date().toISOString() }, { pretty: false }); } catch {}
+}
+
+/** The most recently active session id, or null. */
+export function currentSession() {
+  return readJson(currentFile(), null)?.session ?? null;
+}
+
+/** Every session that has ever written, newest activity first. */
+export function listSessions() {
+  let ids = [];
+  try { ids = fs.readdirSync(sessionsDir()); } catch { return []; }
+  const cur = currentSession();
+  return ids
+    .map((id) => {
+      const state = readJson(sessionStateFile(id), null);
+      const hud = readJson(sessionHudFile(id), null);
+      if (!state && !hud) return null;
+      const at = [state?.at, hud?.at].filter(Boolean).sort().pop() ?? null;
+      return { id, current: id === cur, at, state, hud };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? "")));
+}
+
+/**
+ * Totals across every session.
+ *
+ * This is the number nobody else reports. Running several agents at once multiplies spend
+ * with no combined view anywhere — each session only ever knows its own usage.
+ */
+export function aggregate() {
+  const sessions = listSessions();
+  const totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0, messages: 0 };
+  let costUsd = null;
+  let live = 0;
+  const FRESH_MS = 5 * 60 * 1000;
+  const now = Date.now();
+
+  for (const s of sessions) {
+    const t = s.hud?.totals;
+    if (t) for (const k of Object.keys(totals)) totals[k] += Number(t[k]) || 0;
+    if (Number.isFinite(s.hud?.costUsd)) costUsd = (costUsd ?? 0) + s.hud.costUsd;
+    if (s.at && now - Date.parse(s.at) < FRESH_MS) live++;
+  }
+  return { sessions: sessions.length, live, totals, costUsd };
+}
+
+/**
+ * Record the current animation state. `seq` lets readers detect a change without polling
+ * content. Pass `extra.session` to keep concurrent agents from overwriting each other.
+ */
 export function emit(state, extra = {}) {
-  const prev = readJson(stateFile(), null);
+  const session = extra.session ?? null;
+  const file = session ? sessionStateFile(session) : stateFile();
+  const prev = readJson(file, null);
   const next = {
     seq: (prev?.seq ?? 0) + 1,
     state,
     at: new Date().toISOString(),
     ...extra,
   };
-  writeJson(stateFile(), next, { pretty: false });
+  if (session) ensureDir(sessionDir(session));
+  writeJson(file, next, { pretty: false });
+
+  // The flat file stays as the "whatever happened most recently" view that `foreman watch`
+  // shows by default. It is deliberately last-writer-wins; the per-session file is the
+  // authoritative one.
+  if (session) { writeJson(stateFile(), next, { pretty: false }); markCurrent(session); }
   return next;
 }
 
-export function readState() {
-  return readJson(stateFile(), { seq: 0, state: "idle", at: null });
+export function readState({ session = null } = {}) {
+  const file = session ? sessionStateFile(session) : stateFile();
+  return readJson(file, { seq: 0, state: "idle", at: null });
 }
 
-export function writeHud(hud) {
-  const prev = readJson(hudFile(), null);
+export function writeHud(hud, { session = null } = {}) {
+  const file = session ? sessionHudFile(session) : hudFile();
+  const prev = readJson(file, null);
   const next = { seq: (prev?.seq ?? 0) + 1, at: new Date().toISOString(), ...hud };
 
   // Infer burn rate from the delta between refreshes. No source gives a rate, only a
@@ -72,12 +139,15 @@ export function writeHud(hud) {
     next.burn = prev?.burn ?? 0;
   }
 
-  writeJson(hudFile(), next, { pretty: false });
+  if (session) ensureDir(sessionDir(session));
+  writeJson(file, next, { pretty: false });
+  if (session) { writeJson(hudFile(), next, { pretty: false }); markCurrent(session); }
   return next;
 }
 
-export function readHud() {
-  return readJson(hudFile(), { seq: 0, ctxPct: 0, costUsd: 0, burn: 0 });
+export function readHud({ session = null } = {}) {
+  const file = session ? sessionHudFile(session) : hudFile();
+  return readJson(file, { seq: 0, ctxPct: 0, costUsd: 0, burn: 0 });
 }
 
 /**
@@ -122,7 +192,13 @@ export function normalizeHook(payload) {
     input: payload?.tool_input ?? null,
     // Claude Code reports failure inside tool_response; goose has a dedicated event.
     failed: Boolean(r && (r.error || r.stderr || r.success === false)),
+    // Both agents send session_id. Verified from a live Claude Code payload 2026-07-30,
+    // whose keys were: cwd, duration_ms, effort, hook_event_name, permission_mode,
+    // prompt_id, session_id, tool_input, tool_name, tool_response, tool_use_id,
+    // transcript_path.
+    session: payload?.session_id ?? null,
     transcriptPath: payload?.transcript_path ?? null,
+    cwd: payload?.cwd ?? payload?.working_dir ?? null,
   };
 }
 

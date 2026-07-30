@@ -67,6 +67,7 @@ ${org("foreman")} ${dim("— know what your agent is doing and what it's costing
   ${b("foreman hook")}               map a hook payload to a state ${dim("(called by hooks, reads stdin)")}
   ${b("foreman emit")} <state>        set the state by hand
   ${b("foreman sample")}             read cost + context from the transcript ${dim("(--json)")}
+  ${b("foreman sessions")}           every agent running, and the combined total
   ${b("foreman set")} <key> <value>   windowTokens · price · character
   ${b("foreman svg")} [state]        render to SVG            ${dim("(--all, --live, --pose, --prop)")}
   ${b("foreman list")}                installed characters
@@ -195,7 +196,9 @@ async function hookCmd() {
   const norm = store.normalizeHook(payload);
   const state = store.stateForHook(payload);
   if (state) {
-    try { store.emit(state, { via: norm.event, tool: norm.tool || null }); } catch { /* silent */ }
+    // Keyed by session so concurrent agents stop overwriting one another.
+    try { store.emit(state, { via: norm.event, tool: norm.tool || null, session: norm.session }); }
+    catch { /* silent */ }
   }
 
   // Refresh the numbers from the transcript. This is the whole reason cost and context
@@ -203,13 +206,13 @@ async function hookCmd() {
   // not fire reliably, while this runs on every single tool call. Every failure mode is
   // swallowed — a hook that throws or hangs would break the user's agent, and a stale
   // readout is a far smaller problem than that.
-  try { sampleIntoHud(norm.transcriptPath); } catch { /* never break the hook */ }
+  try { sampleIntoHud(norm.transcriptPath, norm.session); } catch { /* never break the hook */ }
 }
 
 /** Read the transcript and persist a HUD reading. Returns the sample, or null. */
-function sampleIntoHud(transcriptPath) {
+function sampleIntoHud(transcriptPath, session = null) {
   const cfg = store.getConfig();
-  const prev = store.readHud();
+  const prev = store.readHud({ session });
   const s = sample({
     transcriptPath,
     prev,
@@ -218,7 +221,7 @@ function sampleIntoHud(transcriptPath) {
     price: cfg.price ? PRICES[cfg.price] ?? null : null,
   });
   if (!s) return null;
-  store.writeHud(s);
+  store.writeHud({ ...s, session }, { session });
   return s;
 }
 
@@ -351,6 +354,43 @@ async function main() {
       }
       console.log(`\n  ${dim(`model ${s.model ?? "?"} · ${s.speed ?? "?"} · ${s.serviceTier ?? "?"}`)}`);
       console.log(`  ${dim(s.tx.file)}\n`);
+      break;
+    }
+
+    case "sessions": {
+      const rows = store.listSessions();
+      if (!rows.length) { warn("no sessions recorded yet — they appear on the first tool call after init"); break; }
+
+      const agg = store.aggregate();
+      const n = (v) => Number(v ?? 0).toLocaleString("en-US");
+      const ago = (at) => {
+        if (!at) return "—";
+        const s = Math.max(0, (Date.now() - Date.parse(at)) / 1000);
+        return s < 90 ? `${Math.round(s)}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`;
+      };
+
+      console.log("");
+      for (const r of rows) {
+        const live = r.at && Date.now() - Date.parse(r.at) < 5 * 60 * 1000;
+        const mark = r.current ? org("●") : live ? grn("○") : dim("·");
+        const h = r.hud ?? {};
+        const pct = Number.isFinite(h.ctxPct) ? `${Math.round(h.ctxPct)}%`.padStart(4) : "   —";
+        const tok = h.ctxUsed ? n(h.ctxUsed).padStart(9) : "        —";
+        const col = !Number.isFinite(h.ctxPct) ? dim : h.ctxPct >= 85 ? red : h.ctxPct >= 55 ? ylw : grn;
+        console.log(`  ${mark} ${b(r.id.slice(0, 8))} ${dim(ago(r.at).padStart(4))}  ` +
+                    `${col(pct)} ${dim(tok + " tok")}  ${dim((r.state?.state ?? "—").padEnd(9))}` +
+                    `${h.windowExceeded ? red("  window setting wrong") : ""}`);
+      }
+
+      // The point of keying by session: nowhere else adds these up. Running four agents
+      // is four times the spend, and every other tool shows you one quarter of it.
+      console.log(`\n  ${b("all sessions combined")} ${dim(`(${agg.live} active in the last 5 min, ${agg.sessions} total)`)}`);
+      console.log(`    output ${n(agg.totals.outputTokens)}   input ${n(agg.totals.inputTokens)}`);
+      console.log(`    cache read ${n(agg.totals.cacheReadTokens)}   cache write ${n(agg.totals.cacheCreateTokens)}`);
+      console.log(`    ${n(agg.totals.messages)} assistant messages`);
+      if (agg.costUsd === null) console.log(`    ${dim("cost not reported — no price set (foreman set price ...)")}`);
+      else console.log(`    ${b("~$" + agg.costUsd.toFixed(2))} ${ylw("ESTIMATE")} ${dim("summed across sessions")}`);
+      console.log("");
       break;
     }
 

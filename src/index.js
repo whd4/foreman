@@ -11,7 +11,8 @@ export { sample, findTranscript, projectDir, tailUsage, scanTotals,
 export { load as loadCharacter, list as listCharacters, validate as validateCharacter,
          REQUIRED_POSES, REQUIRED_PROPS } from "./character.js";
 export { emit, readState, writeHud, readHud, getConfig, setConfig,
-         stateForHook, normalizeHook, toolKind } from "./state.js";
+         stateForHook, normalizeHook, toolKind,
+         listSessions, currentSession, aggregate } from "./state.js";
 export { parsePayload, formatLine } from "./statusline.js";
 export * as claudeCode from "./adapters/claude-code.js";
 export * as goose from "./adapters/goose.js";

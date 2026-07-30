@@ -95,6 +95,38 @@ outright when they've diverged — the failure that hid for 76 minutes.
 
 ---
 
+## Several agents at once
+
+You are probably running more than one. Every reading is keyed by session id, so concurrent
+agents stop overwriting each other — and the totals get added up:
+
+```bash
+foreman sessions
+```
+
+```
+  ● 3d273174   3s   26%   257,280 tok  dig
+  ○ a42b2fcb   4s   40%   398,309 tok  hammer
+  ○ f8faab57  46s   20%   202,099 tok  dig
+  ○ b666aad2   2m   26%   254,674 tok  wake
+
+  all sessions combined (4 active in the last 5 min, 4 total)
+    output 824,100   input 1,791
+    cache read 180,885,968   cache write 4,869,735
+    812 assistant messages
+```
+
+That is real output from one developer's machine. Every session individually looked healthy at
+20–40% of its window. **None of them knew about the other three.** Four agents is four times
+the spend, and each one only ever shows you a quarter of it.
+
+Earlier versions wrote every session into one pair of files, so the readout showed whichever
+agent happened to fire last — a number that looked authoritative and meant nothing. Session ids
+arrive inside hook payloads, which is untrusted input becoming a path, so they are sanitised
+before they touch the filesystem.
+
+---
+
 ## Commands
 
 | Command | What it does |
@@ -102,6 +134,7 @@ outright when they've diverged — the failure that hid for 76 minutes.
 | `foreman init [agent]` | Wire up `claude-code` (default) or `goose`. `--dry-run`, `--force` |
 | `foreman watch` | Live character in your terminal. `--once` for a single frame |
 | `foreman sample` | Read cost + context from the transcript. `--json`, `--window`, `--price` |
+| `foreman sessions` | Every agent running, and the combined total |
 | `foreman set <k> <v>` | `windowTokens`, `price`, `character` |
 | `foreman status` | Print the readout. Called by the status line |
 | `foreman hook` | Map a hook payload to a state **and refresh the numbers**. Reads stdin |

@@ -26,6 +26,35 @@ export const hudFile     = () => path.join(configDir(), "hud.json");
 export const userChars   = () => path.join(configDir(), "characters");
 
 /**
+ * Per-session storage.
+ *
+ * Agents run concurrently — three live Claude Code sessions were observed on one machine
+ * on 2026-07-30, all firing hooks into the same two files. Whoever wrote last won, so the
+ * readout jumped between unrelated sessions and the numbers meant nothing. State is keyed
+ * by session from here on; the flat files above are kept as a "most recent activity" view
+ * so older readers and `foreman watch` with no arguments still work.
+ */
+export const sessionsDir = () => path.join(configDir(), "sessions");
+export const currentFile = () => path.join(configDir(), "current.json");
+
+/**
+ * Session ids arrive inside a hook payload, which is untrusted input that becomes a path.
+ * Anything outside this set is stripped so a crafted id cannot escape the sessions folder.
+ */
+export function safeSessionId(id) {
+  const s = String(id ?? "").replace(/[^A-Za-z0-9._-]/g, "").slice(0, 128);
+  // Stripping separators is not enough on its own: an id of exactly ".." survives the
+  // filter and resolves to the PARENT directory, which would put a session's state file
+  // on top of the top-level config. Anything that is only dots is not a name.
+  if (!s || /^\.+$/.test(s)) return "unknown";
+  return s.replace(/^\.+/, "") || "unknown";
+}
+
+export const sessionDir      = (id) => path.join(sessionsDir(), safeSessionId(id));
+export const sessionStateFile = (id) => path.join(sessionDir(id), "state.json");
+export const sessionHudFile   = (id) => path.join(sessionDir(id), "hud.json");
+
+/**
  * Claude Code's settings file. Same location on every platform — Claude Code
  * uses ~/.claude regardless of OS rather than the platform config dir.
  */
