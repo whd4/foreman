@@ -75,11 +75,20 @@ export function install({ dryRun = false, force = false, bin = resolveBin() } = 
     statusLine = "replaced";
     warnings.push("replaced an existing statusLine because --force was given; the old one is in the backup");
   } else {
+    // Kept, and that is now the RIGHT outcome rather than a degraded one.
+    //
+    // This warning used to say the HUD would "stay empty" without --force, which was true
+    // only while the status line was the sole source of cost and context. Since the
+    // transcript reader landed, the numbers come from the agent's own transcript and do
+    // not depend on this surface at all. Leaving the old text in place pushed strangers
+    // toward --force on their very first run — i.e. toward clobbering a status line they
+    // had deliberately configured, to fix a problem they did not have. Caught in a
+    // clean-room install 2026-07-30, where `doctor` and `init` disagreed on screen.
     statusLine = "kept";
     warnings.push(
-      "you already have a statusLine configured, so it was left alone. " +
-      "Cost and context come from it, so the HUD will stay empty until you either " +
-      "re-run with --force or call `foreman status` from your own script."
+      "you already have a statusLine configured, so it was left alone — nothing of yours " +
+      "was touched. Cost and context are read from the agent's transcript, so they work " +
+      "regardless. Only pass --force if you actively want the readout on your prompt line."
     );
   }
 
