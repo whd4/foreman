@@ -63,6 +63,7 @@ ${org("fmn")} ${dim("— know what your agent is doing and what it's costing")}
 
   ${b("fmn init")} [agent]        wire up hooks + status line   ${dim("(default: claude-code)")}
   ${b("fmn watch")}              live character in this terminal
+  ${b("fmn serve")} [port]        live dashboard — every meter, real data ${dim("(default 7961)")}
   ${b("fmn status")}              print the one-line readout    ${dim("(called by the status line)")}
   ${b("fmn hook")}               map a hook payload to a state ${dim("(called by hooks, reads stdin)")}
   ${b("fmn emit")} <state>        set the state by hand
@@ -288,6 +289,21 @@ async function main() {
     case "watch": await watch(); break;
     case "status": await statusCmd(); break;
     case "hook": await hookCmd(); break;
+
+    case "serve": {
+      const { serve } = await import("../src/serve.js");
+      const pFlag = rest.find((a) => a.startsWith("--port="));
+      const port = Number(pFlag ? pFlag.split("=")[1] : positional[0]) || 7961;
+      try {
+        const { url } = await serve({ port });
+        console.log(`\n  ${org("foreman")} ${dim("live dashboard")}  ${b(url)}`);
+        console.log(`  ${dim("every meter reads your real sessions · ctrl-c to stop")}\n`);
+      } catch (e) {
+        bad(e.code === "EADDRINUSE" ? `port ${port} is already in use — try: fmn serve --port=7962` : String(e.message || e));
+        process.exit(1);
+      }
+      break;
+    }
 
     case "emit": {
       const s = positional[0];
