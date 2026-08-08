@@ -7,7 +7,8 @@ export { renderSvg, poseSvg, propSvg, frameToSvg, contactSheet,
          mergeRects, rectsToMarkup, bounds, defaultSize } from "./svg.js";
 export { liveDocument, MOTION, resolveMotion } from "./svg-live.js";
 export { sample, findTranscript, projectDir, tailUsage, scanTotals,
-         promptTokens, estimateCost, PRICES } from "./transcript.js";
+         promptTokens, estimateCost, PRICES,
+         scanSubagents, subagentDir } from "./transcript.js";
 export { load as loadCharacter, list as listCharacters, validate as validateCharacter,
          REQUIRED_POSES, REQUIRED_PROPS } from "./character.js";
 export { emit, readState, writeHud, readHud, getConfig, setConfig,

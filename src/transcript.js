@@ -161,26 +161,63 @@ export function tailUsage(file, { bytes = TAIL_BYTES } = {}) {
   }
 }
 
+const EMPTY_TOTALS = Object.freeze({
+  inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0, messages: 0,
+});
+
+/** The four usage fields off one record, as plain numbers. */
+function usageNumbers(u) {
+  return {
+    inputTokens:       Number(u.input_tokens) || 0,
+    outputTokens:      Number(u.output_tokens) || 0,
+    cacheReadTokens:   Number(u.cache_read_input_tokens) || 0,
+    cacheCreateTokens: Number(u.cache_creation_input_tokens) || 0,
+  };
+}
+
 /**
  * Accumulate totals over records added since `fromOffset`.
- * Incremental by byte offset, so a long session costs the same per sample as a short one.
- * A file that shrank (or a different file) resets rather than producing nonsense.
+ *
+ * ONE RECORD IS NOT ONE MESSAGE. Claude writes MULTIPLE JSONL records for a single
+ * assistant message as it streams, each carrying a CUMULATIVE usage snapshot — the same
+ * `message.id` appearing with output_tokens 2, then 900, then 2047. Summing every record
+ * therefore counts the same tokens over and over.
+ *
+ * Measured on a live 3.5 MB transcript, 2026-08-02: 620 usage records but only 273 unique
+ * message ids, 184 of them duplicated. Naive sum 788,424 output tokens; correct total
+ * 296,971. A 2.65x overcount, present since this file was written and invisible because
+ * the number merely looked large rather than wrong.
+ *   [found by an independent cross-vendor review, then reproduced here before accepting]
+ *
+ * The fix: keep the LAST snapshot per message. Because snapshots for one message arrive
+ * contiguously, carrying only the previous id and what it contributed is enough — when
+ * the same id reappears, its earlier contribution is backed out and replaced. That keeps
+ * the scan O(new bytes) and, critically, keeps it correct ACROSS incremental resumes:
+ * `prev.lastId` / `prev.lastCounted` let a later sample finish a message that was still
+ * streaming when the previous sample stopped.
  */
-export function scanTotals(file, { fromOffset = 0, prevTotals = null } = {}) {
-  const empty = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0, messages: 0 };
+export function scanTotals(file, { fromOffset = 0, prevTotals = null, prevMessage = null } = {}) {
+  const empty = { ...EMPTY_TOTALS };
   let fd, size;
   try {
     fd = fs.openSync(file, "r");
     size = fs.fstatSync(fd).size;
-  } catch { return { totals: { ...empty }, offset: 0, reset: true }; }
+  } catch { return { totals: { ...empty }, offset: 0, reset: true, message: null }; }
 
   let start = fromOffset;
   let totals = prevTotals ? { ...empty, ...prevTotals } : { ...empty };
+  // The message that was mid-stream when we last stopped, and what it had contributed.
+  let lastId = prevMessage?.id ?? null;
+  let lastCounted = prevMessage?.counted ?? null;
   let reset = false;
-  if (!Number.isFinite(start) || start < 0 || start > size) { start = 0; totals = { ...empty }; reset = true; }
+  if (!Number.isFinite(start) || start < 0 || start > size) {
+    start = 0; totals = { ...empty }; lastId = null; lastCounted = null; reset = true;
+  }
 
   try {
-    if (size === start) return { totals, offset: size, reset };
+    if (size === start) {
+      return { totals, offset: size, reset, message: lastId ? { id: lastId, counted: lastCounted } : null };
+    }
     const len = size - start;
     const buf = Buffer.alloc(len);
     fs.readSync(fd, buf, 0, len, start);
@@ -190,21 +227,117 @@ export function scanTotals(file, { fromOffset = 0, prevTotals = null } = {}) {
     // The final element is whatever follows the last newline — possibly a half-written
     // record. Leave it unconsumed so the next sample picks it up whole.
     const tailFragment = lines.pop() ?? "";
+    let anon = 0;
     for (const raw of lines) {
-      const u = usageOf(parseLine(raw.replace(/\r$/, "")));
+      const rec = parseLine(raw.replace(/\r$/, ""));
+      const u = usageOf(rec);
       if (!u) continue;
-      totals.inputTokens       += Number(u.input_tokens) || 0;
-      totals.outputTokens      += Number(u.output_tokens) || 0;
-      totals.cacheReadTokens   += Number(u.cache_read_input_tokens) || 0;
-      totals.cacheCreateTokens += Number(u.cache_creation_input_tokens) || 0;
-      totals.messages          += 1;
+      const n = usageNumbers(u);
+      // A record with no id cannot be de-duplicated, so treat each as its own message.
+      const id = rec?.message?.id ?? ` anon-${start}-${anon++}`;
+
+      if (id === lastId && lastCounted) {
+        // Newer snapshot of the SAME message: replace, do not add. Deltas can be
+        // negative if a provider ever reports a smaller figure; subtraction handles it.
+        for (const k of Object.keys(EMPTY_TOTALS)) {
+          if (k === "messages") continue;
+          totals[k] += (n[k] ?? 0) - (lastCounted[k] ?? 0);
+        }
+        lastCounted = n;
+      } else {
+        for (const k of Object.keys(EMPTY_TOTALS)) {
+          if (k === "messages") continue;
+          totals[k] += n[k] ?? 0;
+        }
+        totals.messages += 1;
+        lastId = id;
+        lastCounted = n;
+      }
     }
-    return { totals, offset: size - Buffer.byteLength(tailFragment, "utf8"), reset };
+    return {
+      totals,
+      offset: size - Buffer.byteLength(tailFragment, "utf8"),
+      reset,
+      message: lastId ? { id: lastId, counted: lastCounted } : null,
+    };
   } catch {
-    return { totals, offset: start, reset };
+    return { totals, offset: start, reset, message: lastId ? { id: lastId, counted: lastCounted } : null };
   } finally {
     try { fs.closeSync(fd); } catch {}
   }
+}
+
+/**
+ * Where a session's subagent transcripts live.
+ *
+ * Claude Code writes the main session to `<project>/<session-id>.jsonl` and every
+ * subagent to `<project>/<session-id>/subagents/**\/*.jsonl` — a sibling TREE, not a
+ * sibling file. Scanning only the main transcript therefore misses every token a
+ * subagent spends.
+ *
+ * That is not a rounding error. Measured in a live session on 2026-08-02: main
+ * transcript 3.55 MB, subagent tree 3.40 MB — 49% of all activity, and 604k+ tokens
+ * across two workflow runs, none of it visible. For an instrument whose entire purpose
+ * is showing what agents cost, being blind to agent spend defeats the thesis: the HUD
+ * reads calm while real burn is roughly double.
+ */
+export function subagentDir(mainFile) {
+  if (!mainFile) return null;
+  return mainFile.replace(/\.jsonl$/i, "") + path.sep + "subagents";
+}
+
+/** Every .jsonl under a directory, recursively. Returns [] rather than throwing. */
+function walkJsonl(dir, out = []) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) walkJsonl(full, out);
+    else if (e.isFile() && e.name.endsWith(".jsonl")) out.push(full);
+  }
+  return out;
+}
+
+/**
+ * Totals across every subagent transcript for this session.
+ *
+ * Incremental exactly like scanTotals, but per file: `prevOffsets` maps path -> byte
+ * offset, so a session with 200 subagent files still costs one stat + one short read per
+ * file per sample. A file that shrank or vanished resets itself alone, never the whole set.
+ */
+export function scanSubagents(mainFile, { prevFiles = {} } = {}) {
+  const empty = { ...EMPTY_TOTALS };
+  const dir = subagentDir(mainFile);
+  const result = { totals: { ...empty }, files: {}, fileCount: 0, bytes: 0 };
+  if (!dir || !fs.existsSync(dir)) return result;
+
+  for (const f of walkJsonl(dir)) {
+    let size = 0, mtimeMs = 0;
+    try { const st = fs.statSync(f); size = st.size; mtimeMs = st.mtimeMs; } catch { continue; }
+    result.fileCount += 1;
+    result.bytes += size;
+
+    const prev = prevFiles[f];
+    // Resume ONLY from a complete prior record whose file has grown from a known size.
+    // Anything else — missing totals, a shrunk file, or a same-size replacement with a
+    // newer mtime — rescans that one file from zero. Cheap, and it cannot silently
+    // under-count. A bare offset check cannot detect a same-size replacement at all.
+    const usable = prev
+      && Number.isFinite(prev.offset) && prev.offset >= 0 && prev.offset <= size
+      && prev.totals && typeof prev.totals === "object"
+      && Number.isFinite(prev.size) && size >= prev.size
+      && !(size === prev.size && Number.isFinite(prev.mtimeMs) && mtimeMs > prev.mtimeMs);
+
+    const { totals, offset, message } = scanTotals(f, {
+      fromOffset: usable ? prev.offset : 0,
+      prevTotals: usable ? prev.totals : null,
+      prevMessage: usable ? prev.message : null,
+    });
+
+    result.files[f] = { offset, totals, size, mtimeMs, message };
+    for (const k of Object.keys(empty)) result.totals[k] += totals[k] ?? 0;
+  }
+  return result;
 }
 
 /**
@@ -212,6 +345,19 @@ export function scanTotals(file, { fromOffset = 0, prevTotals = null } = {}) {
  *
  * `windowTokens` is an ASSERTION, not a measurement. Pass what you believe the window to
  * be; the result records where that belief came from and flags it when usage exceeds it.
+ *
+ * WHAT `totals` MEANS: the WHOLE session — parent plus every subagent. That is what a
+ * person means by "what did this cost", and it is what every existing display reads. An
+ * earlier attempt put the subagent numbers in a new `combined` field and left `totals`
+ * parent-only; the library was then correct while `fmn sample`, the watch HUD and
+ * multi-session aggregation all still showed the undercount. A fix nothing reads is not
+ * a fix. [cross-vendor review, 2026-08-02]
+ *
+ * `mainTotals` and `subagentTotals` remain available for anyone who needs the split.
+ *
+ * Context is the one thing that must NOT be combined: `ctxUsed`/`ctxPct` come solely from
+ * the latest parent prompt, because a subagent's tokens never occupied this agent's
+ * window. Cost aggregates; context does not.
  */
 export function sample({
   transcriptPath,
@@ -221,6 +367,7 @@ export function sample({
   windowSource = null,
   price = null,
   prev = null,
+  includeSubagents = true,
 } = {}) {
   const file = findTranscript({ transcriptPath, cwd, home });
   if (!file) return null;
@@ -229,10 +376,26 @@ export function sample({
   if (!head) return null;
 
   const sameFile = prev?.tx?.file === file;
-  const { totals, offset, reset } = scanTotals(file, {
+  const { totals: mainTotals, offset, reset, message } = scanTotals(file, {
     fromOffset: sameFile ? prev?.tx?.offset ?? 0 : 0,
     prevTotals: sameFile ? prev?.tx?.totals : null,
+    prevMessage: sameFile ? prev?.tx?.message : null,
   });
+
+  const sub = includeSubagents
+    ? scanSubagents(file, { prevFiles: sameFile ? prev?.sub?.files ?? {} : {} })
+    : null;
+
+  const subTotals = sub ? sub.totals : { ...EMPTY_TOTALS };
+
+  // The session figure. This is `totals` because it is what every consumer means.
+  const totals = {
+    inputTokens:       (mainTotals.inputTokens       ?? 0) + (subTotals.inputTokens       ?? 0),
+    outputTokens:      (mainTotals.outputTokens      ?? 0) + (subTotals.outputTokens      ?? 0),
+    cacheReadTokens:   (mainTotals.cacheReadTokens   ?? 0) + (subTotals.cacheReadTokens   ?? 0),
+    cacheCreateTokens: (mainTotals.cacheCreateTokens ?? 0) + (subTotals.cacheCreateTokens ?? 0),
+    messages:          (mainTotals.messages          ?? 0) + (subTotals.messages          ?? 0),
+  };
 
   const used = head.promptTokens;
   const over = Number.isFinite(windowTokens) && windowTokens > 0 && used > windowTokens;
@@ -240,6 +403,7 @@ export function sample({
     ? Math.round((used / windowTokens) * 1000) / 10
     : null;
 
+  // Cost is estimated on the COMBINED figure - subagent spend is spend.
   const cost = estimateCost(totals, price);
 
   return {
@@ -260,6 +424,22 @@ export function sample({
     costUsd: cost ? Math.round(cost.usd * 10000) / 10000 : null,
     costBasis: cost ? { label: cost.label, source: cost.source, note: cost.note,
                         excludesCacheReads: cost.excludesCacheReads } : null,
-    tx: { file, offset, totals, size: head.fileSize, reset },
+    // `tx.totals` carries the PARENT-only running state, because that is what the
+    // incremental resume needs. `message` carries the message that was mid-stream when
+    // this scan stopped, so the next sample finishes it rather than re-adding it.
+    tx: { file, offset, totals: mainTotals, message, size: head.fileSize, reset },
+
+    // The split, for anyone who needs it. `totals` above is the combined session figure.
+    mainTotals,
+    subagentTotals: sub ? sub.totals : null,
+    sub: sub ? { fileCount: sub.fileCount, bytes: sub.bytes, totals: sub.totals, files: sub.files } : null,
+
+    // Share of output tokens spent by subagents. The headline number for how much a
+    // transcript-only instrument would have missed on this session.
+    subagentShare: (() => {
+      if (!sub) return null;
+      const m = mainTotals.outputTokens ?? 0, s = subTotals.outputTokens ?? 0;
+      return m + s > 0 ? Math.round((s / (m + s)) * 1000) / 10 : 0;
+    })(),
   };
 }
