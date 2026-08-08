@@ -160,6 +160,20 @@ test("a supplied price produces a labelled estimate that excludes cache reads", 
   assert.equal(s.costBasis.excludesCacheReads, 9_999_999);
 });
 
+test("the standard rate is the standard rate, not the fast-mode premium", () => {
+  // Billing the fast premium to an ordinary session overstates it 2x. The two
+  // presets must stay distinct, and neither may silently become the other.
+  const f = write([rec({ input: 1_000_000, out: 1_000_000, cacheRead: 9_999_999 })]);
+  const s = sample({ transcriptPath: f, price: PRICES["opus-5-standard"] });
+  assert.equal(s.costUsd, 30);                       // 1M in @ $5 + 1M out @ $25
+  assert.match(s.costBasis.source, /\d{4}-\d{2}-\d{2}/);
+  assert.equal(s.costBasis.excludesCacheReads, 9_999_999);
+
+  const fast = sample({ transcriptPath: f, price: PRICES["opus-5-fast"] });
+  assert.equal(fast.costUsd, 60);
+  assert.ok(fast.costUsd > s.costUsd, "fast mode is the premium, not the default");
+});
+
 test("every price preset carries a source and a date", () => {
   // an unsourced rate is how a confident wrong number gets shipped
   for (const [name, p] of Object.entries(PRICES)) {

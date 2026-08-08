@@ -74,7 +74,8 @@ tokens it excludes. With no price set it shows a blank, because a guessed rate i
 nothing.
 
 ```bash
-fmn set price opus-5-fast     # only rates verified against a dated source ship
+fmn set price opus-5-standard   # or opus-5-fast, if you run fast mode
+                                # only rates verified against a dated source ship
 ```
 
 **The window size is an assertion, not a measurement.** The transcript says how much was sent,

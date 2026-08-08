@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+### `opus-5-standard` price preset
+
+The table had only `opus-5-fast`, whose own note said standard-tier pricing was *not* that
+number and was not verified. So anyone not running fast mode had two options: no cost at all,
+or a figure overstated 2x. Standard is now the first preset listed, because it is what an
+ordinary session actually bills at.
+
+- **$5 / input MTok, $25 / output MTok**, sourced to the Anthropic models overview page and
+  dated, per the rule every entry in this table follows. Confirmed against a second
+  independent source before shipping — a wrong rate here is a confident wrong number, which
+  is worse than the blank it replaces.
+- Both notes now point at each other, so neither preset can be mistaken for the other.
+- A test asserts the two rates stay distinct and that standard is the cheaper one; the
+  generic preset test already required a dated source.
+
+### Usage accounting was wrong in two directions at once
+
+Cost figures move for everyone. See the commit for the measurements.
+
+- **Streamed records were double-counted.** Claude writes several JSONL records per assistant
+  message, each with a *cumulative* usage snapshot; summing them all overcounted output
+  tokens 2.65x on a measured live transcript. Only the last snapshot per message id counts now.
+- **Subagent spend was invisible.** Subagent transcripts live in a sibling tree, not a sibling
+  file. On a measured session that was 49% of all activity. `totals` now means the whole
+  session — parent plus subagents — because that is what "what did this cost" means.
+- Context is deliberately *not* combined: a subagent's tokens never sat in this agent's window.
+  Cost aggregates; context does not.
+
+### `fmn serve`
+
+A local dashboard on 127.0.0.1:7961. Six skins over one data feed — no sliders, no demo mode;
+if a meter moves, a session moved.
+
 ## 0.5.0 — 2026-07-30
 
 ### The command is now `fmn`, not `foreman`

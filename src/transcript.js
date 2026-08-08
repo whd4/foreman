@@ -40,11 +40,17 @@ const TAIL_BYTES = 256 * 1024;
  * everything else is absent so that asking for it fails loudly instead of guessing.
  */
 export const PRICES = {
+  "opus-5-standard": {
+    input: 5, output: 25,
+    label: "Opus 5, standard",
+    source: "platform.claude.com/docs/en/about-claude/models/overview.md, read 2026-08-07",
+    note: "Standard tier — the rate an ordinary session bills at. Fast mode is a premium; see opus-5-fast.",
+  },
   "opus-5-fast": {
     input: 10, output: 50,
     label: "Opus 5, fast mode",
     source: "~/.claude/anthropic-latest.md, read 2026-07-30",
-    note: "Documented for FAST mode. Standard-tier pricing is NOT this number and is not verified here.",
+    note: "FAST mode only, which is billed at a premium. If you are not running fast mode, opus-5-standard is your rate.",
   },
 };
 
