@@ -105,34 +105,36 @@ const PAGE = String.raw`<!doctype html>
 @media(prefers-color-scheme:light){:root{--ground:#F7F4EE;--raise:#FFF;--sink:#EFEAE1;
   --line:#E0D7CA;--line-hi:#C9BEAE;--ink:#1D1813;--dim:#635A50;--faint:#8A8177;
   --good:#2E9450;--warn:#9F7310;--crit:#B23A28;--in:#9A7410;--out:#1F7A6E;--cache:#3F5480;--cachew:#6E4AA0}}
-body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+/* Type scale: nothing on this page may be smaller than 13px. The whole product is an
+   instrument you read at a glance, so 11px labels were a defect, not a style. */
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.6}
 .wrap{max-width:1120px;margin:0 auto;padding:26px 22px 70px;display:flex;flex-direction:column;gap:20px}
-h1{font-family:var(--mono);font-size:19px;font-weight:700;letter-spacing:-.02em;margin:0}
+h1{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin:0}
 h1 em{font-style:normal;color:var(--mango)}
-.sub{color:var(--dim);font-size:13.5px;margin:0}
+.sub{color:var(--dim);font-size:15px;margin:0}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--sink);
-  border:1px solid var(--line);border-radius:11px;padding:10px 13px;font-family:var(--mono);font-size:11px}
-.skin{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--dim);background:transparent;
-  border:1px solid var(--line-hi);border-radius:6px;padding:6px 11px;cursor:pointer}
+  border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-family:var(--mono);font-size:14px}
+.skin{font-family:var(--mono);font-size:15px;letter-spacing:.04em;color:var(--dim);background:transparent;
+  border:1px solid var(--line-hi);border-radius:7px;padding:10px 16px;cursor:pointer}
 .skin:hover{color:var(--ink);border-color:var(--ink)}
 .skin[aria-pressed=true]{background:var(--mango);color:#1A1006;border-color:var(--mango)}
 .skin:focus-visible{outline:2px solid var(--mango);outline-offset:2px}
 .live{margin-left:auto;display:inline-flex;align-items:center;gap:7px;color:var(--faint)}
 .live i{width:8px;height:8px;border-radius:50%;background:var(--good);display:block}
 .stage{background:var(--raise);border:1px solid var(--line);border-radius:13px;overflow:hidden}
-#cv{display:block;width:100%;height:300px;background:var(--sink);image-rendering:pixelated}
-.read{display:flex;gap:15px;flex-wrap:wrap;align-items:center;padding:11px 16px;
-  font-family:var(--mono);font-size:11.5px;color:var(--faint);border-top:1px solid var(--line)}
+#cv{display:block;width:100%;height:clamp(340px,46vh,520px);background:var(--sink);image-rendering:pixelated}
+.read{display:flex;gap:15px;flex-wrap:wrap;align-items:center;padding:13px 16px;
+  font-family:var(--mono);font-size:14.5px;color:var(--faint);border-top:1px solid var(--line)}
 .read b{color:var(--ink);font-variant-numeric:tabular-nums}
 .zone{margin-left:auto;text-transform:uppercase;letter-spacing:.07em}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:820px){.grid{grid-template-columns:1fr}}
 .card{background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.card h2{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+.card h2{font-family:var(--mono);font-size:13px;letter-spacing:.13em;text-transform:uppercase;
   color:var(--faint);margin:0 0 10px}
-.rows{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow:auto}
-.row{display:grid;grid-template-columns:9px 66px 46px 42px 1fr;gap:9px;align-items:center;
-  font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.rows{display:flex;flex-direction:column;gap:7px;max-height:320px;overflow:auto}
+.row{display:grid;grid-template-columns:10px 80px 56px 52px 1fr;gap:10px;align-items:center;
+  font-family:var(--mono);font-size:14.5px;color:var(--dim)}
 .row b{color:var(--ink);font-variant-numeric:tabular-nums}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--line-hi)}
 .dot.on{background:var(--good)} .dot.cur{background:var(--mango)}
@@ -140,14 +142,14 @@ h1 em{font-style:normal;color:var(--mango)}
 .mini i{display:block;height:100%;background:var(--good)}
 .mini i.w{background:var(--warn)} .mini i.c{background:var(--crit)}
 .tok{display:flex;flex-direction:column;gap:7px}
-.tokrow{display:grid;grid-template-columns:78px 1fr 84px;gap:9px;align-items:center;
-  font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.tokrow{display:grid;grid-template-columns:94px 1fr 100px;gap:10px;align-items:center;
+  font-family:var(--mono);font-size:14.5px;color:var(--dim)}
 .tokrow b{color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
-.tbar{height:8px;border-radius:3px;background:var(--sink);border:1px solid var(--line);overflow:hidden}
+.tbar{height:11px;border-radius:3px;background:var(--sink);border:1px solid var(--line);overflow:hidden}
 .tbar i{display:block;height:100%}
-.note{font-size:12px;color:var(--faint);margin-top:9px;line-height:1.5}
+.note{font-size:13.5px;color:var(--faint);margin-top:9px;line-height:1.5}
 .warnbox{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:0 10px 10px 0;
-  background:var(--raise);padding:11px 14px;font-size:12.5px;color:var(--dim)}
+  background:var(--raise);padding:12px 15px;font-size:14px;color:var(--dim)}
 .warnbox b{color:var(--ink)}
 </style></head><body><div class="wrap">
 
@@ -361,7 +363,9 @@ const SKINS={
 
 // ── plumbing ──
 const cv=document.getElementById("cv"),cx2=cv.getContext("2d");cx2.imageSmoothingEnabled=false;
-let skin=localStorage.getItem("fmn.skin")||"vault";
+// Default to the skin with the character in it. "vault" was an abstract meter, so a
+// first-time visitor landed on a page with no mascot and no obvious way to find one.
+let skin=localStorage.getItem("fmn.skin")||"strip";
 const bar=document.getElementById("skins");
 const btns={};
 for(const k of Object.keys(SKINS)){
@@ -377,7 +381,16 @@ function fit(){const r=cv.getBoundingClientRect();if(r.width<2)return;
  cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);
  cx2.setTransform(dpr,0,0,dpr,0,0);cx2.imageSmoothingEnabled=false;
  W=Math.floor(r.width/4);H=Math.floor(r.height/4);}
-addEventListener("resize",fit);fit();
+// fit() bails when the canvas has no layout yet, which is the normal state on the very
+// first run of an inline script. It used to be called exactly once here, so losing that
+// race left the backing store at the HTML default of 300x150 while CSS stretched it to
+// full width — a ~3.6x upscale of a low-res buffer, permanently blurry, with no event
+// that would ever retry. Measured on a real load: 300x150 painted into 1074x300, i.e.
+// 8% of the pixels it should have had. A ResizeObserver fires once layout exists and
+// again on every size change, so the race cannot be lost and cannot go unrecovered.
+addEventListener("resize",fit);
+if(typeof ResizeObserver==="function"){new ResizeObserver(()=>{fit();draw();}).observe(cv);}
+fit();
 
 // One draw. Kept separate from the rAF loop because rAF is PAUSED in a background tab
 // while setInterval keeps polling — so without this the numbers advance and the picture
