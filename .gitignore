@@ -11,3 +11,6 @@ coverage/
 # never commit a real config or a captured session
 .foreman/
 *.backup-*
+
+# launch/marketing drafts stay out of the public repo
+LAUNCH-*.md
