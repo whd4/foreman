@@ -152,12 +152,12 @@ test("no price means no cost, not a zero", () => {
   assert.equal(estimateCost({ inputTokens: 1 }, null), null);
 });
 
-test("a supplied price produces a labelled estimate that excludes cache reads", () => {
+test("a supplied price produces a labelled estimate that INCLUDES cache reads", () => {
   const f = write([rec({ input: 1_000_000, out: 1_000_000, cacheRead: 9_999_999 })]);
   const s = sample({ transcriptPath: f, price: PRICES["opus-5-fast"] });
-  assert.equal(s.costUsd, 60);                       // 1M in @ $10 + 1M out @ $50
-  assert.match(s.costBasis.source, /anthropic-latest/);
-  assert.equal(s.costBasis.excludesCacheReads, 9_999_999);
+  assert.equal(s.costUsd, 70);          // 1M in @$10 + 1M out @$50 + ~10M read @$1
+  assert.match(s.costBasis.source, /\d{4}-\d{2}-\d{2}/);
+  assert.equal(s.costBasis.includesCacheReads, 9_999_999);
 });
 
 test("the standard rate is the standard rate, not the fast-mode premium", () => {
@@ -165,20 +165,51 @@ test("the standard rate is the standard rate, not the fast-mode premium", () => 
   // presets must stay distinct, and neither may silently become the other.
   const f = write([rec({ input: 1_000_000, out: 1_000_000, cacheRead: 9_999_999 })]);
   const s = sample({ transcriptPath: f, price: PRICES["opus-5-standard"] });
-  assert.equal(s.costUsd, 30);                       // 1M in @ $5 + 1M out @ $25
+  assert.equal(s.costUsd, 35);          // 1M in @$5 + 1M out @$25 + ~10M read @$0.50
   assert.match(s.costBasis.source, /\d{4}-\d{2}-\d{2}/);
-  assert.equal(s.costBasis.excludesCacheReads, 9_999_999);
+  assert.equal(s.costBasis.includesCacheReads, 9_999_999);
 
   const fast = sample({ transcriptPath: f, price: PRICES["opus-5-fast"] });
-  assert.equal(fast.costUsd, 60);
+  assert.equal(fast.costUsd, 70);
   assert.ok(fast.costUsd > s.costUsd, "fast mode is the premium, not the default");
 });
 
-test("every price preset carries a source and a date", () => {
+test("cache reads are priced, not dropped — the order-of-magnitude bug", () => {
+  // A two-rate model billed cache reads at nothing and cache writes at the INPUT
+  // rate. On a cached agent workload that understates the true figure several-fold.
+  const f = write([rec({ input: 0, out: 0, cacheRead: 10_000_000, cacheCreate: 0 })]);
+  const s = sample({ transcriptPath: f, price: PRICES["opus-5-standard"] });
+  assert.equal(s.costUsd, 5);           // 10M reads @ $0.50/MTok — never zero
+});
+
+test("an unresolved cache-write TTL is reported as a range, never as one number", () => {
+  // 5-minute writes bill at 1.25x input, 1-hour at 2x. We do not know which Claude
+  // Code uses, so the spread is shown rather than silently resolved.
+  const f = write([rec({ input: 0, out: 0, cacheRead: 0, cacheCreate: 1_000_000 })]);
+  const s = sample({ transcriptPath: f, price: PRICES["opus-5-standard"] });
+  assert.equal(s.costUsd, 6.25);                     // 5m write
+  assert.equal(s.costBasis.usdHigh, 10);             // 1h write
+  assert.equal(s.costBasis.cacheWriteUnresolved, true);
+});
+
+test("with no cache writes there is nothing unresolved and the range collapses", () => {
+  const f = write([rec({ input: 1_000_000, out: 0, cacheRead: 0, cacheCreate: 0 })]);
+  const s = sample({ transcriptPath: f, price: PRICES["opus-5-standard"] });
+  assert.equal(s.costBasis.cacheWriteUnresolved, false);
+  assert.equal(s.costUsd, s.costBasis.usdHigh);
+});
+
+test("every price preset carries a source, a date, and all five rates", () => {
   // an unsourced rate is how a confident wrong number gets shipped
   for (const [name, p] of Object.entries(PRICES)) {
     assert.ok(p.source && /\d{4}-\d{2}-\d{2}/.test(p.source), `${name} has no dated source`);
-    assert.ok(Number.isFinite(p.input) && Number.isFinite(p.output), `${name} has no rates`);
+    for (const k of ["input", "cacheWrite5m", "cacheWrite1h", "cacheRead", "output"]) {
+      assert.ok(Number.isFinite(p[k]), `${name} is missing the ${k} rate`);
+    }
+    // The published multipliers: 5m write = 1.25x input, 1h write = 2x, read = 0.1x.
+    assert.equal(p.cacheWrite5m, p.input * 1.25, `${name} 5m write is not 1.25x input`);
+    assert.equal(p.cacheWrite1h, p.input * 2,    `${name} 1h write is not 2x input`);
+    assert.equal(p.cacheRead,    p.input * 0.1,  `${name} cache read is not 0.1x input`);
   }
 });
 

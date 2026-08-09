@@ -363,10 +363,15 @@ async function main() {
         const known = Object.keys(PRICES);
         if (known.length) console.log(`    ${dim(`set one: fmn set price ${known[0]}`)}`);
       } else {
-        console.log(`    ${b("~$" + s.costUsd.toFixed(2))} ${ylw("ESTIMATE")} ${dim(s.costBasis.label)}`);
+        const headline = s.costBasis.cacheWriteUnresolved
+          ? `~$${s.costUsd.toFixed(2)} – $${s.costBasis.usdHigh.toFixed(2)}`
+          : `~$${s.costUsd.toFixed(2)}`;
+        console.log(`    ${b(headline)} ${ylw("ESTIMATE")} ${dim(s.costBasis.label)}`);
         console.log(`    ${dim("source: " + s.costBasis.source)}`);
         if (s.costBasis.note) console.log(`    ${ylw("!")} ${dim(s.costBasis.note)}`);
-        console.log(`    ${dim(`excludes ${n(s.costBasis.excludesCacheReads)} cache-read tokens — billed at a rate not verified here`)}`);
+        console.log(`    ${dim(`includes ${n(s.costBasis.includesCacheReads)} cache-read tokens at the verified read rate`)}`);
+        if (s.costBasis.cacheWriteUnresolved)
+          console.log(`    ${ylw("!")} ${dim("range is 5-minute vs 1-hour cache writes — Claude Code's TTL is not established")}`);
       }
       console.log(`\n  ${dim(`model ${s.model ?? "?"} · ${s.speed ?? "?"} · ${s.serviceTier ?? "?"}`)}`);
       console.log(`  ${dim(s.tx.file)}\n`);

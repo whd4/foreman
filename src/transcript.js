@@ -41,31 +41,50 @@ const TAIL_BYTES = 256 * 1024;
  */
 export const PRICES = {
   "opus-5-standard": {
-    input: 5, output: 25,
+    input: 5, cacheWrite5m: 6.25, cacheWrite1h: 10, cacheRead: 0.5, output: 25,
     label: "Opus 5, standard",
-    source: "platform.claude.com/docs/en/about-claude/models/overview.md, read 2026-08-07",
+    source: "platform.claude.com/docs/en/about-claude/pricing, read 2026-08-08",
     note: "Standard tier — the rate an ordinary session bills at. Fast mode is a premium; see opus-5-fast.",
   },
   "opus-5-fast": {
-    input: 10, output: 50,
+    input: 10, cacheWrite5m: 12.5, cacheWrite1h: 20, cacheRead: 1, output: 50,
     label: "Opus 5, fast mode",
-    source: "~/.claude/anthropic-latest.md, read 2026-07-30",
+    source: "platform.claude.com/docs/en/about-claude/pricing, read 2026-08-08",
     note: "FAST mode only, which is billed at a premium. If you are not running fast mode, opus-5-standard is your rate.",
   },
 };
 
-/** Cache reads and cache writes are not billed at the input rate; without a verified
- *  multiplier we do not pretend to know one. Callers get the raw counts and decide. */
+/**
+ * Five rates, not two. A two-rate model understates a cached agent workload by an order of
+ * magnitude: cache reads alone can dwarf input+output, and cache writes bill ABOVE the input
+ * rate, never at it.
+ *
+ * One thing is still genuinely unknown — whether Claude Code writes 5-minute or 1-hour caches.
+ * That is a real spread, so it is reported as a range rather than resolved by a guess. `usd`
+ * is the LOW bound; `usdHigh` is the other end. Never present `usd` alone as the figure when
+ * `cacheWriteUnresolved` is set.
+ */
 export function estimateCost(totals, price) {
   if (!price) return null;
-  const inTok = (totals.inputTokens ?? 0) + (totals.cacheCreateTokens ?? 0);
-  const outTok = totals.outputTokens ?? 0;
+  const perM = (tok, rate) => ((tok ?? 0) / 1e6) * rate;
+  const cacheCreate = totals.cacheCreateTokens ?? 0;
+
+  const settled = perM(totals.inputTokens, price.input)
+                + perM(totals.outputTokens, price.output)
+                + perM(totals.cacheReadTokens, price.cacheRead);
+
+  const low  = settled + perM(cacheCreate, price.cacheWrite5m);
+  const high = settled + perM(cacheCreate, price.cacheWrite1h);
+
   return {
-    usd: (inTok / 1e6) * price.input + (outTok / 1e6) * price.output,
+    usd: low,
+    usdHigh: high,
     label: price.label,
     source: price.source,
     note: price.note,
-    excludesCacheReads: totals.cacheReadTokens ?? 0,
+    // True only when the 5m-vs-1h choice actually moves the number.
+    cacheWriteUnresolved: cacheCreate > 0,
+    includesCacheReads: totals.cacheReadTokens ?? 0,
   };
 }
 
@@ -429,7 +448,9 @@ export function sample({
     totals,
     costUsd: cost ? Math.round(cost.usd * 10000) / 10000 : null,
     costBasis: cost ? { label: cost.label, source: cost.source, note: cost.note,
-                        excludesCacheReads: cost.excludesCacheReads } : null,
+                        usdHigh: Math.round(cost.usdHigh * 10000) / 10000,
+                        cacheWriteUnresolved: cost.cacheWriteUnresolved,
+                        includesCacheReads: cost.includesCacheReads } : null,
     // `tx.totals` carries the PARENT-only running state, because that is what the
     // incremental resume needs. `message` carries the message that was mid-stream when
     // this scan stopped, so the next sample finishes it rather than re-adding it.
