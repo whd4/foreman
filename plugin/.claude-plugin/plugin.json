@@ -1,0 +1,15 @@
+{
+  "name": "foreman",
+  "displayName": "Foreman",
+  "version": "0.1.0",
+  "description": "See what your coding agent is doing and what it's costing. Animated status character driven by real token counts read from the session transcript.",
+  "author": {
+    "name": "Wm. H. Dwyer IV",
+    "url": "https://github.com/whd4/foreman"
+  },
+  "homepage": "https://github.com/whd4/foreman",
+  "repository": "https://github.com/whd4/foreman",
+  "license": "MIT",
+  "keywords": ["cost", "context", "observability", "statusline", "tokens", "mascot"],
+  "hooks": "./hooks/hooks.json"
+}
