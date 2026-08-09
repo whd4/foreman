@@ -1,6 +1,55 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 — 2026-08-09
+
+Cost figures move for everyone in this release, in both directions. If you have been quoting
+a number from 0.5.0, requote it.
+
+### Cache reads and writes are priced — the order-of-magnitude bug
+
+The cost model billed input and output only: cache writes were folded in at the *input* rate,
+and cache reads were dropped entirely. On a cached agent workload that is not a rounding
+error — one measured session carried **35.6M cache-read tokens against 1.4k input**.
+
+- **Five rates, not two.** Cache writes bill above input, never at it.
+- The 5-minute vs 1-hour cache TTL that Claude Code writes is genuinely unknown, so it is
+  **reported as a range instead of resolved by a guess** — `usd` is the low bound, `usdHigh`
+  the other end, and the CLI prints both whenever the choice moves the number.
+- Rates resourced to `platform.claude.com/docs/en/about-claude/pricing`, read 2026-08-08,
+  replacing the undated `anthropic-latest.md` reference.
+
+### Claude Code plugin
+
+Foreman now installs as a plugin, so **nothing edits your `settings.json`**. `fmn init` has to
+back up, merge into, and rewrite a file you own, guarded by `--force` so it cannot clobber an
+existing status line. A plugin carries its own hooks — nothing to merge, nothing to clobber,
+and uninstalling is removing the plugin.
+
+```bash
+claude --plugin-dir ./plugin
+```
+
+- Eight lifecycle events forward to `fmn hook`. The engine is **not bundled**: the bridge
+  resolves the CLI at runtime, so plugin and package upgrade independently.
+- The bridge never breaks a session — every failure path exits 0, so a missing CLI just means
+  the character never appears — and never hangs, with a 4-second kill on the child.
+- Excluded from the npm tarball; installing the package does not carry it.
+
+### The dashboard was rendering at 8% resolution
+
+Reported as *"the line graph is so small, and numbers I can't see."* It was not small, it was
+blurry, and the cause was a lost race rather than a layout choice. `fit()` sizes the canvas
+backing store from its laid-out box and bails early when that box has no width — and it ran
+once, inline, before layout exists on first load. Measured live: a **300×150 backing store
+painted into 1074×300**, a 3.58× upscale of 8% of the pixels.
+
+### Tests for the accounting nobody was checking
+
+`subagentDir` and `scanSubagents` shipped exported and called on every hook with **zero
+coverage**. Nineteen tests now pin them, including the three resume cases that matter: a file
+that grew mid-stream, one that shrank, and one replaced at identical length with a newer
+mtime — that last is invisible to an offset-only check and would report a stale total
+forever. Suite: 122 → 141.
 
 ### `opus-5-standard` price preset
 
