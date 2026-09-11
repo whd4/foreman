@@ -382,7 +382,7 @@ async function main() {
       const rows = store.listSessions();
       if (!rows.length) { warn("no sessions recorded yet — they appear on the first tool call after init"); break; }
 
-      const agg = store.aggregate();
+      const agg = store.aggregate({ sessions: rows });   // sum the walk above, don't walk twice
       const n = (v) => Number(v ?? 0).toLocaleString("en-US");
       const ago = (at) => {
         if (!at) return "—";

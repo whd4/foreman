@@ -7,15 +7,23 @@
 // Zero dependencies, same as the rest of the package.
 
 import http from "node:http";
-import { listSessions, aggregate, getConfig } from "./state.js";
+import { listSessions, aggregate, getConfig, FRESH_MS } from "./state.js";
 
-const FRESH_MS = 5 * 60 * 1000;
+/**
+ * How many sessions the feed carries. The page renders 14; the rest is for anyone curling
+ * the API. Every live session rides along regardless, so a busy day never hides a room.
+ * 2,009 sessions were on disk on 2026-09-11 — shipping them all made each poll 850 KB.
+ */
+const SESSION_LIMIT = 40;
 
 /** Shape the on-disk session files into something a browser can render directly. */
-export function snapshot() {
-  const now = Date.now();
+export function snapshot({ now = Date.now(), limit = SESSION_LIMIT } = {}) {
   const cfg = getConfig();
-  const sessions = listSessions().map((s) => {
+  // One walk of the sessions folder feeds both the list and the totals. Not `full`: only
+  // sessions that are live, current, new, or in the sweep slice touch disk (see listSessions).
+  const all = listSessions({ full: false, now });
+  const agg = aggregate({ sessions: all, now });
+  const sessions = all.filter((s, i) => i < limit || (s.at && now - Date.parse(s.at) < FRESH_MS)).map((s) => {
     const h = s.hud ?? {};
     const t = h.totals ?? {};
     const age = s.at ? now - Date.parse(s.at) : null;
@@ -46,7 +54,6 @@ export function snapshot() {
     };
   });
 
-  const agg = aggregate();
   const cur = sessions.find((s) => s.current) ?? sessions.find((s) => s.active) ?? sessions[0] ?? null;
 
   return {
@@ -60,6 +67,21 @@ export function snapshot() {
   };
 }
 
+// One snapshot per SNAPSHOT_TTL_MS serves every poller. The page polls every 2 s, so 1 s
+// means each poll sees fresh numbers while a burst of open tabs shares one walk.
+//
+// History: measured 2026-09-08 at 23 s per snapshot with the page piling requests on it,
+// so the port looked dead; the TTL was 5 s then, which only meant a 23 s stall every 5 s.
+// Measured 2026-09-11 with 2,009 sessions on disk: 5.0 s per snapshot before the session
+// cache in state.js, ~40 ms after. The one slow walk left (every file, once) is paid in
+// serve() before the port opens.
+const SNAPSHOT_TTL_MS = 1000;
+let _snap = { at: 0, json: null };
+export function cachedSnapshotJson(now = Date.now()) {
+  if (!_snap.json || now - _snap.at > SNAPSHOT_TTL_MS) _snap = { at: now, json: JSON.stringify(snapshot({ now })) };
+  return _snap.json;
+}
+
 export function createServer() {
   return http.createServer((req, res) => {
     const url = (req.url || "/").split("?")[0];
@@ -68,7 +90,7 @@ export function createServer() {
       res.end(body);
     };
     try {
-      if (url === "/api/state") return send(200, "application/json; charset=utf-8", JSON.stringify(snapshot()));
+      if (url === "/api/state") return send(200, "application/json; charset=utf-8", cachedSnapshotJson());
       if (url === "/" || url === "/index.html") return send(200, "text/html; charset=utf-8", PAGE);
       send(404, "text/plain; charset=utf-8", "not found");
     } catch (e) {
@@ -78,6 +100,9 @@ export function createServer() {
 }
 
 export function serve({ port = 7961, host = "127.0.0.1" } = {}) {
+  // Warm the session cache before the port opens: the first walk reads every session file
+  // once (about 3 s with 2,000 on disk), and the first poll should be as fast as the rest.
+  cachedSnapshotJson();
   return new Promise((resolve, reject) => {
     const s = createServer();
     s.on("error", reject);

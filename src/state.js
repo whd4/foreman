@@ -47,21 +47,81 @@ export function currentSession() {
   return readJson(currentFile(), null)?.session ?? null;
 }
 
-/** Every session that has ever written, newest activity first. */
-export function listSessions() {
+/** A session whose last write is younger than this counts as live. */
+export const FRESH_MS = 5 * 60 * 1000;
+
+// ── the session cache ──────────────────────────────────────────────────────
+//
+// Never re-read a session file that has not changed. 2,009 session directories were on
+// disk on 2026-09-11 and the dashboard polls every two seconds; reading all ~4,000 files
+// per poll took 3.3 s on Windows, so the port answered nothing for hours. Each session's
+// parsed files are kept here with the mtime and size they were read at: an unchanged
+// session costs two stats and no parse, a changed one costs a read, and a cold one (see
+// listSessions) costs nothing at all until the sweep reaches it.
+const _cache = new Map();   // id -> { id, at, atMs, state, hud, sig }
+const SWEEP_PER_CALL = 64;  // cold sessions re-checked per non-full call; ~35 ms of stats
+let _sweepAt = 0;
+
+function fileSig(file) {
+  try { const s = fs.statSync(file); return `${s.mtimeMs}:${s.size}`; } catch { return "-"; }
+}
+
+/** Re-read one session only if either file's mtime or size moved since the last read. */
+function refreshSession(id) {
+  const sf = sessionStateFile(id), hf = sessionHudFile(id);
+  const sig = `${fileSig(sf)}|${fileSig(hf)}`;
+  const prev = _cache.get(id);
+  if (prev && prev.sig === sig) return prev;
+  const state = readJson(sf, null);
+  const hud = readJson(hf, null);
+  if (!state && !hud) { _cache.delete(id); return null; }
+  const at = [state?.at, hud?.at].filter(Boolean).sort().pop() ?? null;
+  const entry = { id, at, atMs: at ? Date.parse(at) : NaN, state, hud, sig };
+  _cache.set(id, entry);
+  return entry;
+}
+
+/** Forget everything read so far. Tests use it; so would a command that must see cold disk. */
+export function resetSessionCache() { _cache.clear(); _sweepAt = 0; }
+
+/**
+ * Every session that has ever written, newest activity first.
+ *
+ * `full` (the default, and what the CLI wants) checks every session's files on every
+ * call: two stats each, a parse only where something moved. `full: false` is the server
+ * path: it checks only sessions live within FRESH_MS, the current session, anything not
+ * seen before, and a rotating slice of `sweep` cold ones per call. A session that wakes
+ * up after an hour is therefore seen on its next write (which makes it current) or when
+ * the sweep reaches it — with 2,000 sessions polled every 2 s, inside about a minute.
+ */
+export function listSessions({ full = true, now = Date.now(), sweep = SWEEP_PER_CALL } = {}) {
   let ids = [];
   try { ids = fs.readdirSync(sessionsDir()); } catch { return []; }
   const cur = currentSession();
-  return ids
-    .map((id) => {
-      const state = readJson(sessionStateFile(id), null);
-      const hud = readJson(sessionHudFile(id), null);
-      if (!state && !hud) return null;
-      const at = [state?.at, hud?.at].filter(Boolean).sort().pop() ?? null;
-      return { id, current: id === cur, at, state, hud };
-    })
-    .filter(Boolean)
-    .sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? "")));
+
+  // Anything that vanished from disk vanishes from memory too.
+  if (_cache.size) {
+    const present = new Set(ids);
+    for (const id of _cache.keys()) if (!present.has(id)) _cache.delete(id);
+  }
+
+  // The sweep is a window over readdir order that advances every call and wraps.
+  let lo = 0, hi = 0;
+  if (!full && ids.length) {
+    lo = _sweepAt % ids.length;
+    hi = lo + sweep;
+    _sweepAt = hi % ids.length;
+  }
+
+  const rows = [];
+  ids.forEach((id, i) => {
+    const cached = _cache.get(id);
+    const swept = !full && ((i >= lo && i < hi) || i < hi - ids.length);
+    const hot = !cached || id === cur || cached.atMs >= now - FRESH_MS || swept;
+    const entry = full || hot ? refreshSession(id) : cached;
+    if (entry) rows.push({ id, current: id === cur, at: entry.at, state: entry.state, hud: entry.hud });
+  });
+  return rows.sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? "")));
 }
 
 /**
@@ -69,22 +129,23 @@ export function listSessions() {
  *
  * This is the number nobody else reports. Running several agents at once multiplies spend
  * with no combined view anywhere — each session only ever knows its own usage.
+ *
+ * Pass `sessions` (a listSessions result) to sum a walk you already did; otherwise this
+ * walks itself, `full` by default.
  */
-export function aggregate() {
-  const sessions = listSessions();
+export function aggregate({ full = true, now = Date.now(), sessions = null } = {}) {
+  const rows = sessions ?? listSessions({ full, now });
   const totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0, messages: 0 };
   let costUsd = null;
   let live = 0;
-  const FRESH_MS = 5 * 60 * 1000;
-  const now = Date.now();
 
-  for (const s of sessions) {
+  for (const s of rows) {
     const t = s.hud?.totals;
     if (t) for (const k of Object.keys(totals)) totals[k] += Number(t[k]) || 0;
     if (Number.isFinite(s.hud?.costUsd)) costUsd = (costUsd ?? 0) + s.hud.costUsd;
     if (s.at && now - Date.parse(s.at) < FRESH_MS) live++;
   }
-  return { sessions: sessions.length, live, totals, costUsd };
+  return { sessions: rows.length, live, totals, costUsd };
 }
 
 /**

@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### `/api/state` answers in milliseconds with thousands of sessions on disk
+
+Every poll re-read every session's two files. With 2,009 session directories on disk
+(2026-09-11) that took 5 s per poll on Windows, the page polls every 2 s, and the port
+answered nothing for hours while the widgets showed stale numbers.
+
+- **A session cache keyed by mtime and size** in `state.js`. An unchanged session costs two
+  stats and no parse; a changed one costs a read.
+- **The server walks only the hot set.** `listSessions({ full: false })` touches sessions that
+  are live, current, or new, plus a rotating slice of 64 cold ones per call, so a session
+  that wakes after an hour is caught on its next write or within about a minute.
+- **The feed carries the newest 40 sessions plus every live one** instead of all of them
+  (850 KB per poll before). `aggregate` still sums every session on disk.
+- The snapshot TTL drops from 5 s to 1 s, and the one slow walk left is paid before the port
+  opens. `fmn sessions` sums the walk it already did instead of walking twice.
+- New: `resetSessionCache()` and `FRESH_MS` exported from the package root.
+
 ## 0.6.0 — 2026-08-09
 
 Cost figures move for everyone in this release, in both directions. If you have been quoting
