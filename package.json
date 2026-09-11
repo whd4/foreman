@@ -1,6 +1,6 @@
 {
   "name": "@whd4/foreman",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "See what your coding agent is doing and what it's costing. Reads cost and context straight from the agent's own transcript, and puts it on screen as a character that reacts to the work.",
   "type": "module",
   "license": "MIT",

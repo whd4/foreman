@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 — 2026-09-11
+
+0.6.0 was tagged on 2026-08-09 but its publish run failed, so nothing after 0.5.0 ever
+reached npm. This is the first release on npm since 0.5.0 and carries everything in the
+0.6.0 section below as well.
 
 ### `/api/state` answers in milliseconds with thousands of sessions on disk
 
